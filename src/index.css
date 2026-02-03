@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@layer base {
+  /* Tailwind v4 CSS variables theme configuration is different, 
+     but "tailwindcss" import handles basic setup. 
+     Custom config should be in CSS or theme block */
+}
+
+/* 
+   Tailwind v4 doesn't use @tailwind directives in the same way if using the new engine,
+   but since we are using postcss plugin with 'tailwindcss' package (v4), 
+   the standard @import "tailwindcss"; is the new way.
+*/
+
+:root {
+  --font-sans: 'Inter', sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  @apply antialiased text-slate-900 bg-slate-50;
+}
