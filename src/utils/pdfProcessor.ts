@@ -4,15 +4,6 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-export interface LabelVariant {
-    id: string;
-    label: string;
-    tlx: number;
-    tly: number;
-    brx: number;
-    bry: number;
-}
-
 export interface CropConfig {
     tlx: number;
     tly: number;
@@ -20,44 +11,25 @@ export interface CropConfig {
     bry: number;
     label: string;
     logo: string;
-    variants?: LabelVariant[];
 }
 
 export const LABEL_CONFIGS: Record<string, CropConfig> = {
     // Exact values provided by user
     FLIPKART: {
-        tlx: 180,
-        tly: 25,
-        brx: 417,
-        bry: 385,
+        tlx: 190,
+        tly: 28,
+        brx: 407,
+        bry: 382,
         label: "Flipkart",
         logo: "https://www.flipkart.com/apple-touch-icon-57x57.png"
     },
     MEESHO: {
-        tlx: 10,
-        tly: 10,
-        brx: 590,
-        bry: 355, // Default to Without Invoice
+        tlx: 50,
+        tly: 50,
+        brx: 350,
+        bry: 500,
         label: "Meesho",
-        logo: "https://supplier.meesho.com/static/favicon.png",
-        variants: [
-            {
-                id: "WITHOUT_INVOICE",
-                label: "Without Invoice",
-                tlx: 10,
-                tly: 10,
-                brx: 590,
-                bry: 355
-            },
-            {
-                id: "WITH_INVOICE",
-                label: "With Invoice",
-                tlx: 10,
-                tly: 10,
-                brx: 590,
-                bry: 630
-            }
-        ]
+        logo: "https://supplier.meesho.com/static/favicon.png"
     },
     AMAZON: {
         tlx: 30,
@@ -65,37 +37,9 @@ export const LABEL_CONFIGS: Record<string, CropConfig> = {
         brx: 320,
         bry: 465,
         label: "Amazon",
-        logo: "https://www.amazon.in/favicon.ico",
-        variants: [
-            {
-                id: "REMOVE_EVEN_PAGES",
-                label: "Remove Even (Invoice) Pages",
-                tlx: 0,
-                tly: 0,
-                brx: 0,
-                bry: 0
-            },
-            {
-                id: "STANDARD_CROP",
-                label: "Standard Crop",
-                tlx: 30,
-                tly: 30,
-                brx: 320,
-                bry: 465
-            }
-        ]
+        logo: "https://www.amazon.in/favicon.ico"
     }
 };
-
-export async function removeEvenPages(sourcePdf: PDFDocument): Promise<PDFDocument> {
-    const newPdf = await PDFDocument.create();
-    const pageIndices = sourcePdf.getPageIndices();
-    // Keep only odd pages (1, 3, 5, ...) -> Indices 0, 2, 4, ...
-    const oddIndices = pageIndices.filter(i => i % 2 === 0);
-    const copiedPages = await newPdf.copyPages(sourcePdf, oddIndices);
-    copiedPages.forEach(page => newPdf.addPage(page));
-    return newPdf;
-}
 
 export async function loadPDF(file: File): Promise<PDFDocument> {
     const arrayBuffer = await file.arrayBuffer();

@@ -32,7 +32,7 @@ export function FileUploader({ onFileSelect, className, multiple = false }: File
             <div
                 {...getRootProps()}
                 className={cn(
-                    "relative group cursor-pointer flex flex-col items-center justify-center w-full h-64 rounded-3xl border-2 border-dashed transition-all duration-300 ease-in-out bg-white/50 backdrop-blur-sm",
+                    "relative group cursor-pointer flex flex-col items-center justify-center w-full h-40 rounded-3xl border-2 border-dashed transition-all duration-300 ease-in-out bg-white/50 backdrop-blur-sm",
                     isDragActive ? "border-indigo-500 bg-indigo-50/50 scale-[1.02]" : "border-slate-300 hover:border-indigo-400 hover:bg-slate-50",
                     isDragReject && "border-red-500 bg-red-50/50",
                 )}
@@ -41,7 +41,7 @@ export function FileUploader({ onFileSelect, className, multiple = false }: File
 
                 <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
                     <div className={cn(
-                        "p-4 rounded-full mb-4 transition-colors duration-300",
+                        "p-3 rounded-full mb-4 transition-colors duration-300",
                         isDragActive ? "bg-indigo-100 text-indigo-600" : "bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500"
                     )}>
                         <Upload className="w-8 h-8" />
