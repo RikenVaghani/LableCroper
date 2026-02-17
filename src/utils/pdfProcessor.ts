@@ -11,33 +11,72 @@ export interface CropConfig {
     bry: number;
     label: string;
     logo: string;
+    variants?: {
+        id: string;
+        label: string;
+        tlx: number;
+        tly: number;
+        brx: number;
+        bry: number;
+    }[];
+    options?: {
+        id: string;
+        label: string;
+    }[];
+    disableCrop?: boolean;
 }
 
 export const LABEL_CONFIGS: Record<string, CropConfig> = {
     // Exact values provided by user
     FLIPKART: {
-        tlx: 190,
+        tlx: 188,
         tly: 28,
         brx: 407,
-        bry: 382,
+        bry: 381,
+        // tlx: 190, tly: 28, brx: 407, bry: 382,
         label: "Flipkart",
-        logo: "https://www.flipkart.com/apple-touch-icon-57x57.png"
+        logo: "./Flipkart.jpg"
     },
     MEESHO: {
-        tlx: 50,
-        tly: 50,
-        brx: 350,
-        bry: 500,
+        tlx: 0,
+        tly: 0,
+        brx: 600,
+        bry: 660,
         label: "Meesho",
-        logo: "https://supplier.meesho.com/static/favicon.png"
+        logo: "./Meesho.jpg",
+        variants: [
+            {
+                id: 'without_invoice',
+                label: 'Without Invoice',
+                tlx: 0, // TODO: Update with actual coordinates
+                tly: 0,
+                brx: 600,
+                bry: 358
+            },
+            {
+                id: 'with_invoice',
+                label: 'With Invoice',
+                tlx: 0, // TODO: Update with actual coordinates
+                tly: 0,
+                brx: 600,
+                bry: 660
+            }
+        ]
     },
     AMAZON: {
-        tlx: 30,
-        tly: 30,
-        brx: 320,
+        tlx: 0,
+        tly: 0,
+        brx: 210,
         bry: 465,
         label: "Amazon",
-        logo: "https://www.amazon.in/favicon.ico"
+        logo: "./Amazon.jpg",
+        options: [
+            {
+                id: 'order_page',
+                label: 'Select Only Order Page'
+            }
+        ],
+        disableCrop: true
     }
 };
 
@@ -57,7 +96,9 @@ async function extractTextFromPage(pdfPage: any): Promise<string> {
 export async function cropLabels(
     sourcePdf: PDFDocument,
     config: CropConfig,
-    extractSku: boolean = false
+    extractSku: boolean = false,
+    variantId: string | null = null,
+    selectedOptions: string[] = []
 ): Promise<PDFDocument> {
     const newPdf = await PDFDocument.create();
     const copiedPages = await newPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
@@ -65,25 +106,54 @@ export async function cropLabels(
     let originalDocProxy: any = null;
     let helveticaFont: any = null;
 
-    if (extractSku) {
+    if (extractSku || selectedOptions.length > 0) {
         const pdfBytes = await sourcePdf.save();
         originalDocProxy = await pdfjsLib.getDocument(pdfBytes).promise;
         helveticaFont = await newPdf.embedFont(StandardFonts.Helvetica);
     }
 
-    const width = config.brx - config.tlx;
-    const height = config.bry - config.tly;
+
+
+    let tlx = config.tlx;
+    let tly = config.tly;
+    let brx = config.brx;
+    let bry = config.bry;
+
+    // Override with variant coordinates if selected
+    if (variantId && config.variants) {
+        const variant = config.variants.find(v => v.id === variantId);
+        if (variant) {
+            tlx = variant.tlx;
+            tly = variant.tly;
+            brx = variant.brx;
+            bry = variant.bry;
+        }
+    }
+
+    const width = brx - tlx;
+    const height = bry - tly;
 
     for (let i = 0; i < copiedPages.length; i++) {
         const page = copiedPages[i];
         const { height: pageHeight } = page.getSize();
 
         // Translate Top-Left origin coordinates to PDF Bottom-Left origin
-        const x = config.tlx;
-        const y = pageHeight - config.bry;
+        const x = tlx;
+        const y = pageHeight - bry;
 
-        page.setCropBox(x, y, width, height);
-        page.setMediaBox(x, y, width, height);
+        if (!config.disableCrop) {
+            page.setCropBox(x, y, width, height);
+            page.setMediaBox(x, y, width, height);
+        }
+
+        // Apply Option Filters
+        if (selectedOptions.includes('order_page')) {
+            // Amazon "Order Page Only" filter: Keep only odd-numbered pages (1, 3, 5...)
+            // Since i is 0-indexed, page 1 is i=0, page 2 is i=1, etc.
+            if (i % 2 !== 0) {
+                continue; // Skip even-indexed pages (2, 4, 6...)
+            }
+        }
 
         if (extractSku && originalDocProxy) {
             try {

@@ -12,6 +12,7 @@ function App() {
   const [mode, setMode] = useState<'CROP' | 'MERGE'>('CROP')
   const [extractSku, setExtractSku] = useState(false)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([])
 
   const handleFileSelect = async (selectedFile: File) => {
     // For now we just default to single file for crop, but will support multiple for merge
@@ -32,13 +33,16 @@ function App() {
     } else {
       setSelectedVariantId(null);
     }
+    setSelectedOptions(platform === 'AMAZON' ? ['order_page'] : []);
     setFiles([])
 
   }
 
   const resetSelection = () => {
     setSelectedPlatform(null)
+    setSelectedPlatform(null)
     setFiles([])
+    setSelectedOptions([])
 
   }
 
@@ -62,7 +66,7 @@ function App() {
 
       // Step 2: Crop (Both modes now support cropping)
       if (selectedPlatform) {
-        finalPdf = await cropLabels(finalPdf, LABEL_CONFIGS[selectedPlatform], extractSku)
+        finalPdf = await cropLabels(finalPdf, LABEL_CONFIGS[selectedPlatform], extractSku, selectedVariantId, selectedOptions)
       }
 
       const pdfBytes = await finalPdf.save()
@@ -124,7 +128,7 @@ function App() {
             Crop Shipping Labels <span className="text-indigo-600">Instantly</span>
           </h1>
           <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto">
-            Automatically crop and format FlipKart, Meesho, and Amazon shipping labels for 4x6 thermal printers. Secure, fast, and 100% free.
+            Automatically crop and format FlipKart, Meesho, and Amazon shipping labels for <b>best print result in fit size</b> on thermal printers. Secure, fast, and 100% free.
           </p>
         </div>
 
@@ -185,18 +189,18 @@ function App() {
                         <div className="w-full max-w-xs space-y-4">
                           {/* Variants Selection */}
                           {(LABEL_CONFIGS[selectedPlatform] as any).variants && (
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                              <label className="block text-sm font-semibold text-slate-700 mb-3 text-center">
-                                Select Layout Type
+                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                              <label className="block text-xs font-semibold text-slate-700 mb-2 text-center">
+                                Select Layout
                               </label>
-                              <div className="flex flex-col sm:flex-row justify-center gap-4">
+                              <div className="flex flex-col sm:flex-row justify-center gap-2">
                                 {(LABEL_CONFIGS[selectedPlatform] as any).variants?.map((variant: any) => (
                                   <label
                                     key={variant.id}
                                     className={cn(
-                                      "flex items-center p-3 rounded-lg border transition-all cursor-pointer flex-1",
+                                      "flex items-center px-2 py-1.5 rounded-md border transition-all cursor-pointer flex-1",
                                       selectedVariantId === variant.id
-                                        ? "bg-indigo-600 border-indigo-600 text-white shadow-md"
+                                        ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
                                         : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300"
                                     )}
                                   >
@@ -208,16 +212,49 @@ function App() {
                                       onChange={() => setSelectedVariantId(variant.id)}
                                       className="sr-only"
                                     />
-                                    <div className="flex items-center justify-center w-full gap-2">
+                                    <div className="flex items-center justify-center w-full gap-1.5">
                                       <div className={cn(
-                                        "w-4 h-4 rounded-full border flex items-center justify-center",
+                                        "w-3 h-3 rounded-full border flex items-center justify-center",
                                         selectedVariantId === variant.id ? "border-white" : "border-slate-300"
                                       )}>
-                                        {selectedVariantId === variant.id && <div className="w-2 h-2 rounded-full bg-white" />}
+                                        {selectedVariantId === variant.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                                       </div>
-                                      <span className="text-sm font-medium">{variant.label}</span>
+                                      <span className="text-xs font-medium">{variant.label}</span>
                                     </div>
                                   </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Options Selection */}
+                          {(LABEL_CONFIGS[selectedPlatform] as any).options && (
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                              <label className="block text-sm font-semibold text-slate-700 mb-3 text-center">
+                                Options
+                              </label>
+                              <div className="space-y-2">
+                                {(LABEL_CONFIGS[selectedPlatform] as any).options?.map((option: any) => (
+                                  <div key={option.id} className="flex items-center justify-center">
+                                    <div className="flex items-center">
+                                      <input
+                                        id={`opt-${option.id}`}
+                                        type="checkbox"
+                                        checked={selectedOptions.includes(option.id)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedOptions([...selectedOptions, option.id]);
+                                          } else {
+                                            setSelectedOptions(selectedOptions.filter(id => id !== option.id));
+                                          }
+                                        }}
+                                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded"
+                                      />
+                                      <label htmlFor={`opt-${option.id}`} className="ml-2 block text-sm text-slate-700 cursor-pointer select-none">
+                                        {option.label}
+                                      </label>
+                                    </div>
+                                  </div>
                                 ))}
                               </div>
                             </div>
@@ -309,11 +346,11 @@ function App() {
                           : "bg-white border-slate-200 hover:border-indigo-600 hover:ring-1 hover:ring-indigo-600 hover:bg-slate-50"
                       )}
                     >
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform overflow-hidden shadow-sm border border-slate-100">
+                      <div className="w-15 h-15 bg-white rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform overflow-hidden shadow-sm border border-slate-100">
                         <img
                           src={config.logo}
                           alt={config.label}
-                          className="w-8 h-8 object-contain"
+                          className="w-full h-full object-cover"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${config.label}&background=random`;
                           }}
@@ -355,11 +392,11 @@ function App() {
                           : "bg-white border-slate-200 hover:border-indigo-600 hover:ring-1 hover:ring-indigo-600 hover:bg-slate-50"
                       )}
                     >
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform overflow-hidden shadow-sm border border-slate-100">
+                      <div className="w-15 h-15 bg-white rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform overflow-hidden shadow-sm border border-slate-100">
                         <img
                           src={config.logo}
                           alt={config.label}
-                          className="w-8 h-8 object-contain"
+                          className="w-full h-full object-cover"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${config.label}&background=random`;
                           }}

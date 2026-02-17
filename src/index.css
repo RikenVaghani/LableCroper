@@ -18,5 +18,8 @@
 
 body {
   font-family: var(--font-sans);
-  @apply antialiased text-slate-900 bg-slate-50;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #0f172a;
+  background-color: #f8fafc;
 }
