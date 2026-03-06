@@ -1,25 +1,43 @@
 @import "tailwindcss";
 
-@layer base {
-  /* Tailwind v4 CSS variables theme configuration is different, 
-     but "tailwindcss" import handles basic setup. 
-     Custom config should be in CSS or theme block */
-}
-
-/* 
-   Tailwind v4 doesn't use @tailwind directives in the same way if using the new engine,
-   but since we are using postcss plugin with 'tailwindcss' package (v4), 
-   the standard @import "tailwindcss"; is the new way.
-*/
-
 :root {
-  --font-sans: 'Inter', sans-serif;
+  --font-sans: 'Manrope', 'Segoe UI', sans-serif;
 }
 
-body {
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #0f172a;
-  background-color: #f8fafc;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-sans);
+    color: #0f172a;
+    background: #f8fafc;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
