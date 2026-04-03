@@ -382,6 +382,11 @@ export function LabelCropper() {
             </ul>
           </div>
         )}
+
+        <p className="text-xs font-medium text-blue-600 mb-2">
+          ✓ Best Result in Fit to Page Position in Thermal Printer
+        </p>
+
       </section>
     </div>
   )
