@@ -19,7 +19,7 @@ export function Layout({ children }: LayoutProps) {
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Easymytools" className="h-full w-full object-contain brightness-0 invert" />
             </div>
             <div>
-              <h1 className="text-base font-bold sm:text-lg">Easymytools</h1>
+              <h1 className="text-base font-bold sm:text-lg">EasyMyTools</h1>
               <p className="text-xs text-slate-500">Simple tools for label and PDF processing</p>
             </div>
           </Link>
@@ -68,7 +68,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="col-span-1 md:col-span-2">
               <h3 className="text-lg font-bold text-slate-900">CodeSpire Technology</h3>
               <p className="mt-2 max-w-xs text-sm text-slate-600">
-                Delivering high-precision thermal printing solutions and custom software architecture.
+                Delivering Easy to used E-Tools and Custom software architecture.
               </p>
             </div>
 
@@ -84,9 +84,7 @@ export function Layout({ children }: LayoutProps) {
           </div>
 
           <div className="mt-12 border-t border-slate-200 pt-8 text-center">
-            <p className="text-xs font-medium text-blue-600 mb-2">
-              ✓ Best Result in Fit to Page Position in Thermal Printer
-            </p>
+
             <p className="text-xs text-slate-500">
               &copy; {new Date().getFullYear()} CodeSpire Technology. All rights reserved.
             </p>
