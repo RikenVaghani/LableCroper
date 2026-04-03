@@ -61,23 +61,35 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </footer> */}
 
-      <footer className="mt-auto border-t border-slate-200 bg-white/50 backdrop-blur-md">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <p className="text-sm font-medium text-slate-900">
-              CodeSpire <span className="text-blue-600">Technology</span>
-            </p>
-
-            <div className="flex flex-col items-center gap-1 md:items-end">
-              <p className="text-xs leading-relaxed text-slate-500">
-                © {new Date().getFullYear()} Riken V. & Satyam N.
-                <span className="mx-2 text-slate-300">|</span>
-                Special thanks to <span className="font-medium text-slate-700">Pratham D.</span>
-              </p>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-500">
-                Optimized for Thermal Printer in Fit-to-Page Mode
+      <footer className="border-t border-slate-200 bg-slate-50/50">
+        <div className="mx-auto max-w-7xl px-6 py-12">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+            {/* Brand Section */}
+            <div className="col-span-1 md:col-span-2">
+              <h3 className="text-lg font-bold text-slate-900">CodeSpire Technology</h3>
+              <p className="mt-2 max-w-xs text-sm text-slate-600">
+                Delivering high-precision thermal printing solutions and custom software architecture.
               </p>
             </div>
+
+            {/* Credits Section */}
+            <div className="text-sm">
+              <h4 className="font-semibold text-slate-900">Developed By</h4>
+              <ul className="mt-2 space-y-1 text-slate-600">
+                <li>R V.</li>
+                <li>S N.</li>
+                <li className="pt-2 text-xs italic text-slate-400">Special thanks: Pratham D.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-12 border-t border-slate-200 pt-8 text-center">
+            <p className="text-xs font-medium text-blue-600 mb-2">
+              ✓ Best Result in Fit to Page Position in Thermal Printer
+            </p>
+            <p className="text-xs text-slate-500">
+              &copy; {new Date().getFullYear()} CodeSpire Technology. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
