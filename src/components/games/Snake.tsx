@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { RotateCcw, Trophy, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const GRID_SIZE = 30
@@ -14,7 +13,6 @@ export function Snake() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [snake, setSnake] = useState<Point[]>([{ x: 10, y: 10 }])
   const [food, setFood] = useState<Point>({ x: 15, y: 15 })
-  const [direction, setDirection] = useState<Direction>('RIGHT')
   const [isGameOver, setIsGameOver] = useState(false)
   const [score, setScore] = useState(0)
   const [highScore, setHighScore] = useState(0)
@@ -51,7 +49,6 @@ export function Snake() {
   const resetGame = () => {
     setSnake([{ x: 10, y: 10 }])
     generateFood([{ x: 10, y: 10 }])
-    setDirection('RIGHT')
     directionRef.current = 'RIGHT'
     setIsGameOver(false)
     setScore(0)
@@ -113,7 +110,6 @@ export function Snake() {
         case 'w':
         case 'W':
           if (directionRef.current !== 'DOWN') {
-            setDirection('UP')
             directionRef.current = 'UP'
           }
           break
@@ -121,7 +117,6 @@ export function Snake() {
         case 's':
         case 'S':
           if (directionRef.current !== 'UP') {
-            setDirection('DOWN')
             directionRef.current = 'DOWN'
           }
           break
@@ -129,7 +124,6 @@ export function Snake() {
         case 'a':
         case 'A':
           if (directionRef.current !== 'RIGHT') {
-            setDirection('LEFT')
             directionRef.current = 'LEFT'
           }
           break
@@ -137,7 +131,6 @@ export function Snake() {
         case 'd':
         case 'D':
           if (directionRef.current !== 'LEFT') {
-            setDirection('RIGHT')
             directionRef.current = 'RIGHT'
           }
           break
@@ -229,7 +222,6 @@ export function Snake() {
     if (isGameOver || isPaused) return
     const opposites = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' }
     if (opposites[newDir] !== directionRef.current) {
-      setDirection(newDir)
       directionRef.current = newDir
     }
   }

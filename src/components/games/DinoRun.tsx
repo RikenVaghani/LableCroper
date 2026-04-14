@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { RotateCcw, Trophy, Play, Cloud } from 'lucide-react'
 
 const CANV_WIDTH = 800
@@ -37,7 +36,7 @@ export function DinoRun() {
   const obstacles = useRef<Obstacle[]>([])
   const gameSpeed = useRef(INITIAL_SPEED)
   const frameCount = useRef(0)
-  const requestRef = useRef<number>()
+  const requestRef = useRef<number>(null)
   const stars = useRef<Star[]>([])
 
   const initGame = useCallback(() => {
@@ -185,7 +184,6 @@ export function DinoRun() {
     ctx.fillRect(dx + 45, dy + 5, 5, 5)
     // Feet (simple animation)
     ctx.fillStyle = isDarkMode ? '#f43f5e' : '#e11d48'
-    const footOffset = (frameCount.current % 10 < 5) ? 0 : 5
     ctx.fillRect(dx + 10, dy + DINO_HEIGHT - 10, 10, 10)
     ctx.fillRect(dx + 25, dy + DINO_HEIGHT - 10, 10, 10)
 

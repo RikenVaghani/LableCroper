@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Gamepad2, ArrowLeft, Grid3X3, FastForward, Layers, Rocket, Activity } from 'lucide-react'
 import { Link } from 'react-router-dom'
