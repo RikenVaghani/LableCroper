@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { Sun, Moon, Gamepad2 } from 'lucide-react'
 import { cn } from '../utils/cn'
 
 interface LayoutProps {
@@ -10,44 +11,88 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const currentPath = location.pathname
 
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') || 'light'
+    }
+    return 'light'
+  })
+
+  useEffect(() => {
+    const root = window.document.documentElement
+    if (theme === 'dark') {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'))
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,_#f0f9ff,_#f8fafc_45%,_#ffffff)] text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,_#f0f9ff,_#f8fafc_45%,_#ffffff)] dark:bg-[radial-gradient(circle_at_top,_#0f172a,_#020617_45%,_#000000)] text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      <header className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-            <div className="h-10 w-10 rounded-xl bg-sky-600 p-2 shadow-sm">
-              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Easymytools" className="h-full w-full object-contain brightness-0 invert" />
+            <div className="h-10 w-10 rounded-xl bg-sky-600 shadow-sm">
+              <img src="/logo.jpg" alt="Easymytools" className="rounded-xl h-full w-full object-contain " />
             </div>
             <div>
               <h1 className="text-base font-bold sm:text-lg">EasyMyTools</h1>
-              <p className="text-xs text-slate-500">Simple tools for label and PDF processing</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Simple tools for label and PDF processing</p>
             </div>
           </Link>
 
-          <nav className="flex w-full gap-2 sm:w-auto">
-            <Link
-              to="/LableCroper"
-              className={cn(
-                'flex-1 rounded-xl border px-4 py-2 text-sm font-semibold transition text-center sm:flex-none',
-                currentPath === '/LableCroper'
-                  ? 'border-sky-600 bg-sky-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-sky-300'
-              )}
+          <div className="flex items-center gap-4">
+            <nav className="flex gap-2">
+              <Link
+                to="/LableCroper"
+                className={cn(
+                  'rounded-xl border px-4 py-2 text-sm font-semibold transition text-center',
+                  currentPath === '/LableCroper'
+                    ? 'border-sky-600 bg-sky-600 text-white'
+                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-sky-300'
+                )}
+              >
+                Label Cropper
+              </Link>
+              <Link
+                to="/PDFTools"
+                className={cn(
+                  'rounded-xl border px-4 py-2 text-sm font-semibold transition text-center',
+                  currentPath === '/PDFTools'
+                    ? 'border-sky-600 bg-sky-600 text-white'
+                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-sky-300'
+                )}
+              >
+                PDF Tools
+              </Link>
+              <Link
+                to="/Games"
+                className={cn(
+                  'rounded-xl border px-3 py-2 text-sm font-semibold transition text-center flex items-center gap-2',
+                  currentPath === '/Games'
+                    ? 'border-purple-600 bg-purple-600 text-white'
+                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-purple-300'
+                )}
+              >
+                <Gamepad2 className="h-4 w-4" />
+                {/* <span className="hidden sm:inline">Games</span> */}
+              </Link>
+            </nav>
+
+            <button
+              onClick={toggleTheme}
+              className="group relative h-10 w-10 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-slate-700 dark:text-slate-300 transition-all hover:border-sky-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+              aria-label="Toggle theme"
             >
-              Label Cropper
-            </Link>
-            <Link
-              to="/PDFTools"
-              className={cn(
-                'flex-1 rounded-xl border px-4 py-2 text-sm font-semibold transition text-center sm:flex-none',
-                currentPath === '/PDFTools'
-                  ? 'border-sky-600 bg-sky-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-sky-300'
-              )}
-            >
-              PDF Tools
-            </Link>
-          </nav>
+              <Sun className="h-full w-full rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute left-[7px] top-[7px] h-[24px] w-[24px] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -61,31 +106,31 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </footer> */}
 
-      <footer className="border-t border-slate-200 bg-slate-50/50">
+      <footer className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
         <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {/* Brand Section */}
             <div className="col-span-1 md:col-span-2">
-              <h3 className="text-lg font-bold text-slate-900">CodeSpire Technology</h3>
-              <p className="mt-2 max-w-xs text-sm text-slate-600">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">CodeSpire Technology</h3>
+              <p className="mt-2 max-w-xs text-sm text-slate-600 dark:text-slate-400">
                 Delivering Easy to used E-Tools and Custom software architecture.
               </p>
             </div>
 
             {/* Credits Section */}
             <div className="text-sm">
-              <h4 className="font-semibold text-slate-900">Developed By</h4>
-              <ul className="mt-2 space-y-1 text-slate-600">
+              <h4 className="font-semibold text-slate-900 dark:text-slate-100">Developed By</h4>
+              <ul className="mt-2 space-y-1 text-slate-600 dark:text-slate-400">
                 <li>R V.</li>
                 <li>S N.</li>
-                <li className="pt-2 text-xs italic text-slate-400">Special thanks: Pratham D.</li>
+                <li className="pt-2 text-xs italic text-slate-400 dark:text-slate-500">Special thanks: Pratham Dhanani.</li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-12 border-t border-slate-200 pt-8 text-center">
+          <div className="mt-12 border-t border-slate-200 dark:border-slate-800 pt-8 text-center">
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               &copy; {new Date().getFullYear()} CodeSpire Technology. All rights reserved.
             </p>
           </div>
