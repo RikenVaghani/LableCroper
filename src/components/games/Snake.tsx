@@ -110,7 +110,6 @@ export function Snake() {
         case 'w':
         case 'W':
           if (directionRef.current !== 'DOWN') {
-            setDirection('UP')
             directionRef.current = 'UP'
           }
           break
@@ -118,7 +117,6 @@ export function Snake() {
         case 's':
         case 'S':
           if (directionRef.current !== 'UP') {
-            setDirection('DOWN')
             directionRef.current = 'DOWN'
           }
           break
@@ -126,7 +124,6 @@ export function Snake() {
         case 'a':
         case 'A':
           if (directionRef.current !== 'RIGHT') {
-            setDirection('LEFT')
             directionRef.current = 'LEFT'
           }
           break
@@ -134,7 +131,6 @@ export function Snake() {
         case 'd':
         case 'D':
           if (directionRef.current !== 'LEFT') {
-            setDirection('RIGHT')
             directionRef.current = 'RIGHT'
           }
           break
@@ -226,7 +222,6 @@ export function Snake() {
     if (isGameOver || isPaused) return
     const opposites = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' }
     if (opposites[newDir] !== directionRef.current) {
-      setDirection(newDir)
       directionRef.current = newDir
     }
   }

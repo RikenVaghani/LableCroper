@@ -83,7 +83,6 @@ export function BlockBreaker() {
   const startGame = () => {
     setLives(3)
     setScore(0)
-    setLevel(1)
     initBricks()
     resetBall()
     setGameState('PLAYING')
