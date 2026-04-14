@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { RotateCcw, Trophy, Heart, ChevronLeft, ChevronRight, Play } from 'lucide-react'
 
 const CANV_WIDTH = 800
@@ -28,7 +27,6 @@ export function BlockBreaker() {
   const [highScore, setHighScore] = useState(0)
   const [lives, setLives] = useState(3)
   const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'GAMEOVER' | 'WON'>('IDLE')
-  const [level, setLevel] = useState(1)
 
   // Game references (mutable state for the loop)
   const paddleRef = useRef({ x: (CANV_WIDTH - PADDLE_WIDTH) / 2 })
@@ -41,7 +39,7 @@ export function BlockBreaker() {
   const bricksRef = useRef<Brick[]>([])
   const rightPressed = useRef(false)
   const leftPressed = useRef(false)
-  const requestRef = useRef<number>()
+  const requestRef = useRef<number>(null)
 
   const initBricks = useCallback(() => {
     const newBricks: Brick[] = []
@@ -85,7 +83,6 @@ export function BlockBreaker() {
   const startGame = () => {
     setLives(3)
     setScore(0)
-    setLevel(1)
     initBricks()
     resetBall()
     setGameState('PLAYING')

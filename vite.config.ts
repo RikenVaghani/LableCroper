@@ -8,5 +8,15 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: '/',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-pdf': ['pdf-lib', 'pdfjs-dist'],
+          'vendor-utils': ['jszip', 'lucide-react', 'framer-motion']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  }
 })

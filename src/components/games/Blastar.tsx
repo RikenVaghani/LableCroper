@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { RotateCcw, Trophy, Zap, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Play } from 'lucide-react'
 
 const CANV_WIDTH = 800
@@ -42,7 +41,7 @@ export function Blastar() {
   const lasers = useRef<Bullet[]>([])
   const stars = useRef<Star[]>([])
   const keys = useRef<{ [key: string]: boolean }>({})
-  const requestRef = useRef<number>()
+  const requestRef = useRef<number>(null)
   const lastShotTime = useRef(0)
 
   const initGame = useCallback(() => {
