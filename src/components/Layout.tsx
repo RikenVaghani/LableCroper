@@ -49,10 +49,10 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-4">
             <nav className="flex gap-2">
               <Link
-                to="/LableCroper"
+                to="/LabelCropper"
                 className={cn(
                   'rounded-xl border px-4 py-2 text-sm font-semibold transition text-center',
-                  currentPath === '/LableCroper'
+                  currentPath === '/LabelCropper'
                     ? 'border-sky-600 bg-sky-600 text-white'
                     : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-sky-300'
                 )}
@@ -113,7 +113,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="col-span-1 md:col-span-2">
               <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">CodeSpire Technology</h3>
               <p className="mt-2 max-w-xs text-sm text-slate-600 dark:text-slate-400">
-                Delivering Easy to used E-Tools and Custom software architecture.
+                Delivering Easy-to-use E-Tools and Custom software architecture.
               </p>
             </div>
 

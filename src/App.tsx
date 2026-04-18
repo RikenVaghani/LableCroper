@@ -23,7 +23,7 @@ function App() {
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/LableCroper" element={<LabelCropper />} />
+            <Route path="/LabelCropper" element={<LabelCropper />} />
             <Route path="/PDFTools" element={<PDFTools />} />
             <Route path="/Games" element={<Games />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -8,7 +8,7 @@ export function Home() {
       title: 'Label Cropper for E-commerce',
       description: 'Automatically crop and process shipping labels for Flipkart, Meesho, and Amazon. Supports dynamic invoice detection and Amazon description extraction.',
       icon: <Scissors className="h-8 w-8 text-sky-600" />,
-      path: '/LableCroper',
+      path: '/LabelCropper',
       color: 'bg-sky-50'
     },
     {
