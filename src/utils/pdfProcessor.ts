@@ -59,9 +59,16 @@ const PLATFORM_MARKERS: Record<SupportedPlatform, PlatformMarker[]> = {
     ],
     MEESHO: [
         { pattern: /\bmeesho\b/i, weight: 4 },
+        { pattern: /\bvalmo express\b/i, weight: 4 },
         { pattern: /\bvalmo pickup\b/i, weight: 4 },
+        { pattern: /\bvalmo\b/i, weight: 3 },
+        { pattern: /\bdelhivery\b/i, weight: 4 },
+        { pattern: /\bxpressbees\b/i, weight: 4 },
+        { pattern: /\bshadowfax\b/i, weight: 4 },
+        { pattern: /\bpickup\s+destination\s+code\b/i, weight: 3 },
+        { pattern: /\breturn\s+code\b/i, weight: 2 },
         { pattern: /\bprepaid:\s*do not collect cash\b/i, weight: 2 },
-        { pattern: /\border no\.?\s*\d{12,}_\d+\b/i, weight: 2 },
+        { pattern: /\border no\.?\s*[:\-]?\s*\d{12,}(?:[_\-]\d+)?\b/i, weight: 3 },
         { pattern: /\bproduct details\b/i, weight: 1 }
     ],
     AMAZON: [
@@ -148,7 +155,8 @@ export async function cropLabels(
     includeDateTimeOnLabel: boolean = false,
     summaryThreshold: number = 0,
     showMultiQtyOnBottom: boolean = false,
-    includeMultiQtySummary: boolean = false
+    includeMultiQtySummary: boolean = false,
+    orderMeeshoByDeliveryPartner: boolean = false
 ): Promise<PDFDocument> {
     const newPdf = await PDFDocument.create();
     
@@ -186,6 +194,7 @@ export async function cropLabels(
         summaryThreshold,
         showMultiQtyOnBottom,
         includeMultiQtySummary,
+        orderMeeshoByDeliveryPartner,
         helveticaFont,
         originalDocProxy
     };

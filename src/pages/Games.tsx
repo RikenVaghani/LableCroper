@@ -96,13 +96,11 @@ export function Games() {
               Classic games reimagined for your browser. Pure fun, no downloads, and absolutely zero distractions.
             </p>
           </div>
-          <div className="hidden lg:block relative h-48 w-48">
-             <div className="absolute inset-0 bg-purple-600/20 blur-3xl rounded-full animate-pulse" />
-             <img 
-               src="/arcade_mascot.png" 
-               alt="Arcade Mascot" 
-               className="h-full w-full object-contain relative z-10 drop-shadow-[0_0_15px_rgba(168,85,247,0.4)]"
-             />
+          <div className="hidden lg:flex relative h-48 w-48 items-center justify-center">
+             <div className="absolute inset-0 bg-purple-600/10 blur-3xl rounded-full" />
+             <div className="relative z-10 flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 shadow-xl">
+                <Rocket className="h-16 w-16 text-white" />
+             </div>
           </div>
         </div>
         

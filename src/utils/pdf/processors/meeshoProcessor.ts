@@ -146,12 +146,20 @@ export async function processMeesho(
         }
     }
 
-    const labelsToInclude: { page: PDFPage, totalQty: number }[] = [];
+    const labelsToInclude: { page: PDFPage, totalQty: number, deliveryPartnerRank: number }[] = [];
+    const deliveryPartnerPriority: RegExp[] = [
+        /\bvalmo express\b/i,
+        /\bvalmo\b/i,
+        /\bdelhivery\b/i,
+        /\bxpressbees\b/i,
+        /\bshadowfax\b/i
+    ];
 
     for (let i = 0; i < copiedPages.length; i++) {
         const page = copiedPages[i];
         const { height: pageHeight } = page.getSize();
         let totalOrderQty = 1;
+        let deliveryPartnerRank = Number.MAX_SAFE_INTEGER;
 
         const tlx = defaultTlx;
         const tly = defaultTly;
@@ -232,6 +240,11 @@ export async function processMeesho(
                 const pdfjsPage = await docProxy.getPage(i + 1);
                 const textContent = await pdfjsPage.getTextContent();
                 const positioned = getPositionedTextItems(textContent.items);
+                const pageText = positioned.map(item => item.text).join(' ');
+                const foundPartnerIndex = deliveryPartnerPriority.findIndex((pattern) => pattern.test(pageText));
+                if (foundPartnerIndex >= 0) {
+                    deliveryPartnerRank = foundPartnerIndex;
+                }
                 const productDetailsHeader = positioned.find(p => p.upper.includes('PRODUCT DETAILS'));
 
                 if (options.includeDateTimeOnLabel && productDetailsHeader && options.helveticaFont) {
@@ -332,12 +345,19 @@ export async function processMeesho(
             }
         }
 
-        labelsToInclude.push({ page, totalQty: totalOrderQty });
+        labelsToInclude.push({ page, totalQty: totalOrderQty, deliveryPartnerRank });
     }
 
-    // Sorting by QTY if enabled
-    if (options.includeMultiQtySummary) {
-        labelsToInclude.sort((a, b) => a.totalQty - b.totalQty);
+    if (options.orderMeeshoByDeliveryPartner || options.includeMultiQtySummary) {
+        labelsToInclude.sort((a, b) => {
+            if (options.orderMeeshoByDeliveryPartner && a.deliveryPartnerRank !== b.deliveryPartnerRank) {
+                return a.deliveryPartnerRank - b.deliveryPartnerRank;
+            }
+            if (options.includeMultiQtySummary && a.totalQty !== b.totalQty) {
+                return a.totalQty - b.totalQty;
+            }
+            return 0;
+        });
     }
 
     // Add all processed label pages to the target PDF

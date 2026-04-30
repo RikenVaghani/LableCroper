@@ -91,6 +91,7 @@ export type ProcessorOptions = {
     summaryThreshold?: number;
     showMultiQtyOnBottom?: boolean;
     includeMultiQtySummary?: boolean;
+    orderMeeshoByDeliveryPartner?: boolean;
     helveticaFont?: PDFFont | null;
     originalDocProxy?: PdfJsDocumentProxy | null;
 };

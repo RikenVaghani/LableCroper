@@ -6,6 +6,7 @@ import {
   detectPlatformFromPdf,
   LABEL_CONFIGS,
   loadPDF,
+  mergePDFs,
   mergePDFDocuments,
   type AmazonDescriptionMode,
   type FlipkartDescriptionMode
@@ -295,6 +296,9 @@ export function LabelCropper() {
   const [includeMultiQtySummary, setIncludeMultiQtySummary] = useState(
     !!savedSettings?.includeMultiQtySummary
   )
+  const [orderMeeshoByDeliveryPartner, setOrderMeeshoByDeliveryPartner] = useState(
+    !!savedSettings?.orderMeeshoByDeliveryPartner
+  )
 
   const [files, setFiles] = useState<File[]>([])
   const [generatedFiles, setGeneratedFiles] = useState<DownloadItem[]>([])
@@ -302,6 +306,7 @@ export function LabelCropper() {
   const [isPreparingZip, setIsPreparingZip] = useState(false)
   const [isDetectingPlatform, setIsDetectingPlatform] = useState(false)
   const [platformDetectionStatus, setPlatformDetectionStatus] = useState<string | null>(null)
+  const detectionRunRef = useRef(0)
 
   // Persist settings whenever they change
   useEffect(() => {
@@ -317,7 +322,8 @@ export function LabelCropper() {
       includeDateTimeOnLabel,
       summaryThreshold,
       showMultiQtyOnBottom,
-      includeMultiQtySummary
+      includeMultiQtySummary,
+      orderMeeshoByDeliveryPartner
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
   }, [
@@ -332,7 +338,8 @@ export function LabelCropper() {
     includeDateTimeOnLabel,
     summaryThreshold,
     showMultiQtyOnBottom,
-    includeMultiQtySummary
+    includeMultiQtySummary,
+    orderMeeshoByDeliveryPartner
   ])
   
   const optionsRef = useRef<HTMLDivElement>(null)
@@ -363,26 +370,40 @@ export function LabelCropper() {
   const handleFilesSelect = async (selectedFiles: File[]) => {
     if (selectedFiles.length === 0) return
 
-    const shouldAutoDetect = files.length === 0
     setFiles(prev => [...prev, ...selectedFiles])
-
-    if (!shouldAutoDetect) return
+    const runId = ++detectionRunRef.current
 
     setIsDetectingPlatform(true)
     try {
-      const detectedPlatform = await detectPlatformFromPdf(selectedFiles[0])
+      let detectedPlatform: PlatformKey | null = null
+      let detectedFileName = ''
+
+      // Try each newly uploaded file until one platform is confidently detected.
+      for (const file of selectedFiles) {
+        const platform = await detectPlatformFromPdf(file)
+        if (platform) {
+          detectedPlatform = platform as PlatformKey
+          detectedFileName = file.name
+          break
+        }
+      }
+
+      // Ignore stale async runs if user uploads again quickly.
+      if (runId !== detectionRunRef.current) return
+
       if (!detectedPlatform) {
         setPlatformDetectionStatus('Platform not detected automatically. Please select manually.')
         return
       }
 
-      const nextPlatform = detectedPlatform as PlatformKey
-      applyPlatformDefaults(nextPlatform, false)
+      applyPlatformDefaults(detectedPlatform, false)
 
-      const platformLabel = LABEL_CONFIGS[nextPlatform].label
-      setPlatformDetectionStatus(`Auto-selected ${platformLabel} from "${selectedFiles[0].name}".`)
+      const platformLabel = LABEL_CONFIGS[detectedPlatform].label
+      setPlatformDetectionStatus(`Auto-selected ${platformLabel} from "${detectedFileName}".`)
     } finally {
-      setIsDetectingPlatform(false)
+      if (runId === detectionRunRef.current) {
+        setIsDetectingPlatform(false)
+      }
     }
   }
 
@@ -455,6 +476,41 @@ export function LabelCropper() {
       const batchTimestamp = buildTimestamp()
       const processedDocs: PDFDocument[] = []
 
+      if (mergeAllFiles && selectedPlatform === 'MEESHO' && files.length > 1) {
+        const mergedSourcePdf = await mergePDFs(files)
+        const processedMergedPdf = await cropLabels(
+          mergedSourcePdf,
+          config,
+          false,
+          selectedVariantId,
+          selectedOptions,
+          amazonDescriptionMode,
+          flipkartDescriptionMode,
+          includeAmazonOrderSummary,
+          includeMeeshoOrderSummary,
+          includeFlipkartOrderSummary,
+          includePageNumbers,
+          includeDateTimeOnLabel,
+          summaryThreshold,
+          showMultiQtyOnBottom,
+          includeMultiQtySummary,
+          orderMeeshoByDeliveryPartner
+        )
+
+        const bytes = await processedMergedPdf.save({ useObjectStreams: false })
+        results.push({
+          name: getDownloadName(`${config.label}_Merged`, 'pdf', undefined, batchTimestamp),
+          blob: new Blob([bytes as BlobPart], { type: 'application/pdf' })
+        })
+
+        for (const item of results) {
+          downloadFile(item)
+        }
+        setGeneratedFiles(results)
+        setFiles([])
+        return
+      }
+
       for (const file of files) {
         const sourcePdf = await loadPDF(file)
         const croppedPdf = await cropLabels(
@@ -472,7 +528,8 @@ export function LabelCropper() {
           includeDateTimeOnLabel,
           summaryThreshold,
           showMultiQtyOnBottom,
-          includeMultiQtySummary
+          includeMultiQtySummary,
+          orderMeeshoByDeliveryPartner
         )
         processedDocs.push(croppedPdf)
 
@@ -804,6 +861,7 @@ export function LabelCropper() {
               <ToggleOption label="Add Date Time On Lable" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
               <ToggleOption label="Multi Ord QTY on Bottom" checked={showMultiQtyOnBottom} onChange={setShowMultiQtyOnBottom} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
+              <ToggleOption label="Order by Delivery Partner" checked={orderMeeshoByDeliveryPartner} onChange={setOrderMeeshoByDeliveryPartner} />
             </div>
           </section>
         )}
