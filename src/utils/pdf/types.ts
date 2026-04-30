@@ -22,7 +22,9 @@ export interface CropConfig {
     disableCrop?: boolean;
 }
 
-export type AmazonDescriptionMode = 'WITH_SKU' | 'WITH_DESCRIPTION';
+export type DescriptionMode = 'WITH_SKU' | 'WITH_DESCRIPTION';
+export type AmazonDescriptionMode = DescriptionMode;
+export type FlipkartDescriptionMode = DescriptionMode;
 
 export type PdfJsRawTextItem = {
     str?: string;
@@ -59,6 +61,8 @@ export type AmazonInvoiceLabelData = {
 
 export type AmazonSummaryEntry = {
     sku: string;
+    orderCount: number;
+    qtyPerSku: string;
     totalQty: number;
 };
 
@@ -69,6 +73,8 @@ export type MeeshoSummaryEntry = {
 
 export type FlipkartSummaryEntry = {
     sku: string;
+    orderCount: number;
+    qtyPerSku: string;
     totalQty: number;
 };
 
@@ -77,9 +83,14 @@ export type ProcessorOptions = {
     variantId?: string | null;
     selectedOptions?: string[];
     amazonDescriptionMode?: AmazonDescriptionMode;
+    flipkartDescriptionMode?: FlipkartDescriptionMode;
     includeAmazonOrderSummary?: boolean;
     includeMeeshoOrderSummary?: boolean;
     includeFlipkartOrderSummary?: boolean;
+    includeDateTimeOnLabel?: boolean;
+    summaryThreshold?: number;
+    showMultiQtyOnBottom?: boolean;
+    includeMultiQtySummary?: boolean;
     helveticaFont?: PDFFont | null;
     originalDocProxy?: PdfJsDocumentProxy | null;
 };

@@ -1,14 +1,16 @@
-import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
-import type { 
-    MeeshoSummaryEntry, 
+import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
+import type {
+    MeeshoSummaryEntry,
     ProcessorOptions,
-    CropConfig 
+    CropConfig
 } from '../types';
-import { 
-    getPositionedTextItems, 
+import {
+    getPositionedTextItems,
     wrapTextToWidth,
-    groupTextLinesByY 
+    groupTextLinesByY,
+    formatProcessTimestamp
 } from '../commonUtils';
+
 
 function drawMeeshoSummaryHeader(
     page: PDFPage,
@@ -125,6 +127,9 @@ export async function processMeesho(
 ): Promise<void> {
     const copiedPages = await targetPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
     const meeshoSummaryMap = new Map<string, number>();
+    const multiQtyMeeshoSummaryMap = new Map<string, number>();
+    const boldFont = options.helveticaFont ? await targetPdf.embedFont(StandardFonts.HelveticaBold) : null;
+    const processTimeStamp = formatProcessTimestamp(new Date());
 
     let defaultTlx = config.tlx;
     let defaultTly = config.tly;
@@ -141,9 +146,12 @@ export async function processMeesho(
         }
     }
 
+    const labelsToInclude: { page: PDFPage, totalQty: number }[] = [];
+
     for (let i = 0; i < copiedPages.length; i++) {
         const page = copiedPages[i];
         const { height: pageHeight } = page.getSize();
+        let totalOrderQty = 1;
 
         const tlx = defaultTlx;
         const tly = defaultTly;
@@ -204,12 +212,45 @@ export async function processMeesho(
             page.setMediaBox(x, y, Math.max(0, width), Math.max(0, height));
         }
 
-        if ((options.extractSku || options.includeMeeshoOrderSummary) && options.originalDocProxy) {
+        const shouldReadMeeshoTextLayer =
+            !!options.originalDocProxy &&
+            (
+                !!options.helveticaFont ||
+                !!options.extractSku ||
+                !!options.includeMeeshoOrderSummary ||
+                !!options.includeDateTimeOnLabel ||
+                !!options.includeMultiQtySummary ||
+                !!options.showMultiQtyOnBottom
+            );
+
+        if (shouldReadMeeshoTextLayer) {
             try {
-                const pdfjsPage = await options.originalDocProxy.getPage(i + 1);
+                const docProxy = options.originalDocProxy;
+                if (!docProxy) {
+                    throw new Error("Missing PDF text layer proxy for Meesho processing.");
+                }
+                const pdfjsPage = await docProxy.getPage(i + 1);
                 const textContent = await pdfjsPage.getTextContent();
                 const positioned = getPositionedTextItems(textContent.items);
-                
+                const productDetailsHeader = positioned.find(p => p.upper.includes('PRODUCT DETAILS'));
+
+                if (options.includeDateTimeOnLabel && productDetailsHeader && options.helveticaFont) {
+                    const processText = `:- Lable Processed At - ${processTimeStamp}`;
+                    const fontSize = 7;
+                    const maxX = page.getWidth() - 10;
+                    const rawX = productDetailsHeader.x + 90;
+                    const textWidth = options.helveticaFont.widthOfTextAtSize(processText, fontSize);
+                    const drawX = Math.max(10, Math.min(rawX, maxX - textWidth));
+
+                    page.drawText(processText, {
+                        x: drawX,
+                        y: productDetailsHeader.y,
+                        size: fontSize,
+                        font: options.helveticaFont,
+                        color: rgb(0, 0, 0)
+                    });
+                }
+
                 const skuHeader = positioned.find(p => p.upper === 'SKU');
                 const sizeHeader = positioned.find(p => p.upper === 'SIZE');
                 const qtyHeader = positioned.find(p => p.upper === 'QTY');
@@ -236,6 +277,7 @@ export async function processMeesho(
 
                         const forbidden = ['SKU', 'SIZE', 'QTY', 'COLOR', 'ORDER NO.', 'FREE SIZE', 'NA'];
                         if (skuText && !forbidden.includes(skuText.toUpperCase())) {
+                            totalOrderQty = qty;
                             if (options.extractSku && options.helveticaFont) {
                                 page.drawText(`SKU: ${skuText}`, {
                                     x: x + 10,
@@ -245,9 +287,42 @@ export async function processMeesho(
                                     color: rgb(0, 0, 0),
                                 });
                             }
-                            
+
                             if (options.includeMeeshoOrderSummary) {
                                 meeshoSummaryMap.set(skuText, (meeshoSummaryMap.get(skuText) ?? 0) + qty);
+                            }
+
+                            if (options.includeMultiQtySummary && qty > 1) {
+                                multiQtyMeeshoSummaryMap.set(skuText, (multiQtyMeeshoSummaryMap.get(skuText) ?? 0) + qty);
+                            }
+
+                            if (options.showMultiQtyOnBottom && qty > 1 && options.helveticaFont) {
+                                const { x: cropX, y: cropY, width: cropWidth } = page.getCropBox();
+                                const text = `Qty : ${qty}`;
+                                const fontSize = 16;
+                                const font = boldFont || options.helveticaFont;
+                                const textWidth = font.widthOfTextAtSize(text, fontSize);
+
+                                const rectWidth = textWidth + 20;
+                                const rectHeight = fontSize + 10;
+                                const rectX = cropX + cropWidth - rectWidth - 5;
+                                const rectY = cropY + 5;
+
+                                page.drawRectangle({
+                                    x: rectX,
+                                    y: rectY,
+                                    width: rectWidth,
+                                    height: rectHeight,
+                                    color: rgb(0, 0, 0)
+                                });
+
+                                page.drawText(text, {
+                                    x: rectX + 10,
+                                    y: rectY + 5,
+                                    size: fontSize,
+                                    font: font,
+                                    color: rgb(1, 1, 1)
+                                });
                             }
                         }
                     }
@@ -257,13 +332,38 @@ export async function processMeesho(
             }
         }
 
-        targetPdf.addPage(page);
+        labelsToInclude.push({ page, totalQty: totalOrderQty });
+    }
+
+    // Sorting by QTY if enabled
+    if (options.includeMultiQtySummary) {
+        labelsToInclude.sort((a, b) => a.totalQty - b.totalQty);
+    }
+
+    // Add all processed label pages to the target PDF
+    for (const item of labelsToInclude) {
+        targetPdf.addPage(item.page);
     }
 
     if (options.includeMeeshoOrderSummary && options.helveticaFont && copiedPages.length > 0) {
+        const orderCount = copiedPages.length;
+        const threshold = options.summaryThreshold ?? 0;
+
+        if (orderCount >= threshold) {
+            const firstPage = copiedPages[0];
+            const { width: pageWidth, height: pageHeight } = firstPage.getSize();
+            const summaryEntries = [...meeshoSummaryMap.entries()]
+                .map(([sku, totalQty]) => ({ sku, totalQty }))
+                .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true }));
+
+            appendMeeshoSummaryPages(targetPdf, summaryEntries, options.helveticaFont, pageWidth, pageHeight);
+        }
+    }
+
+    if (options.includeMultiQtySummary && options.helveticaFont && multiQtyMeeshoSummaryMap.size > 0) {
         const firstPage = copiedPages[0];
         const { width: pageWidth, height: pageHeight } = firstPage.getSize();
-        const summaryEntries = [...meeshoSummaryMap.entries()]
+        const summaryEntries = [...multiQtyMeeshoSummaryMap.entries()]
             .map(([sku, totalQty]) => ({ sku, totalQty }))
             .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true }));
 

@@ -1,19 +1,21 @@
-import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
-import type { 
-    AmazonDescriptionMode, 
-    AmazonInvoiceLabelData, 
-    AmazonSummaryEntry, 
-    PdfJsPageProxy, 
+import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
+import type {
+    AmazonDescriptionMode,
+    AmazonInvoiceLabelData,
+    AmazonSummaryEntry,
+    PdfJsPageProxy,
     PositionedTextItem,
     AmazonInvoiceLineItem,
     ProcessorOptions,
     CropConfig
 } from '../types';
 import { 
+    extractTextFromPage,
     normalizeWhitespace, 
     getPositionedTextItems, 
     wrapTextToWidth,
-    groupTextLinesByY 
+    groupTextLinesByY,
+    formatProcessTimestamp
 } from '../commonUtils';
 
 const AMAZON_DESCRIPTION_HEADER = "DESCRIPTION";
@@ -64,42 +66,118 @@ function formatAmazonQty(value: number): string {
     return value.toFixed(2).replace(/\.?0+$/, '');
 }
 
+
+function isLikelyProcessedAmazonOutput(text: string): boolean {
+    const normalized = normalizeWhitespace(text).toUpperCase();
+    if (!normalized) return false;
+
+    return (
+        normalized.includes("THIS AMAZON LABEL IS CROPPED BY LABELCROPPER") ||
+        normalized.includes("AMAZON LABEL SUMMARY") ||
+        normalized.includes("AMAZON LABLE PROCESSED AT") ||
+        normalized.includes("PROCESS TIME")
+    );
+}
+
+function isAmazonInvoicePageText(text: string): boolean {
+    return !isLikelyProcessedAmazonOutput(text);
+}
+
 function drawAmazonSummaryHeader(
     page: PDFPage,
     font: PDFFont,
     pageWidth: number,
-    y: number,
+    pageHeight: number,
     isContinuation: boolean
 ): number {
-    const titleSize = Math.max(8, pageWidth * 0.02);
-    const subTitleSize = Math.max(6.5, pageWidth * 0.015);
+    const tableX = 16;
+    const tableWidth = pageWidth - 32;
+    const tableTopY = pageHeight - 20;
+    const headlineRowHeight = 22;
+    const headerRowHeight = 20;
+    const ordColWidth = Math.min(48, tableWidth * 0.12);
+    const qtyColWidth = Math.min(48, tableWidth * 0.12);
+    const skuColWidth = Math.max(120, tableWidth - ordColWidth - qtyColWidth);
+    const headlineFontSize = Math.max(8.5, pageWidth * 0.021);
+    const headerFontSize = Math.max(8, pageWidth * 0.017);
 
-    page.drawText(isContinuation ? "Amazon Order Summary (continued)" : "Amazon Order Summary", {
-        x: 16,
-        y,
-        size: titleSize,
+    const todayText = new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    }).format(new Date());
+    const headlineText = isContinuation
+        ? `Amazon label summary (continued) on ${todayText}`
+        : `This Amazon label is cropped by LabelCropper on ${todayText}`;
+
+    const headlineBottomY = tableTopY - headlineRowHeight;
+    const headerBottomY = headlineBottomY - headerRowHeight;
+
+    page.drawRectangle({
+        x: tableX,
+        y: headlineBottomY,
+        width: tableWidth,
+        height: headlineRowHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.8
+    });
+
+    page.drawText(headlineText, {
+        x: tableX + 4,
+        y: headlineBottomY + ((headlineRowHeight - headlineFontSize) / 2),
+        size: headlineFontSize,
         font,
         color: rgb(0, 0, 0)
     });
 
-    const columnY = y - (titleSize + 8);
+    page.drawRectangle({
+        x: tableX,
+        y: headerBottomY,
+        width: ordColWidth,
+        height: headerRowHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.8
+    });
+    page.drawRectangle({
+        x: tableX + ordColWidth,
+        y: headerBottomY,
+        width: qtyColWidth,
+        height: headerRowHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.8
+    });
+    page.drawRectangle({
+        x: tableX + ordColWidth + qtyColWidth,
+        y: headerBottomY,
+        width: skuColWidth,
+        height: headerRowHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.8
+    });
+
+    page.drawText("ORD", {
+        x: tableX + 4,
+        y: headerBottomY + ((headerRowHeight - headerFontSize) / 2),
+        size: headerFontSize,
+        font,
+        color: rgb(0, 0, 0)
+    });
+    page.drawText("QTY", {
+        x: tableX + ordColWidth + 4,
+        y: headerBottomY + ((headerRowHeight - headerFontSize) / 2),
+        size: headerFontSize,
+        font,
+        color: rgb(0, 0, 0)
+    });
     page.drawText("SKU", {
-        x: 16,
-        y: columnY,
-        size: subTitleSize,
-        font,
-        color: rgb(0, 0, 0)
-    });
-    page.drawText("Total Qty", {
-        x: pageWidth - 96,
-        y: columnY,
-        size: subTitleSize,
+        x: tableX + ordColWidth + qtyColWidth + 4,
+        y: headerBottomY + ((headerRowHeight - headerFontSize) / 2),
+        size: headerFontSize,
         font,
         color: rgb(0, 0, 0)
     });
 
-    const dataStartGap = Math.max(14, subTitleSize * 2.2);
-    return columnY - dataStartGap;
+    return headerBottomY;
 }
 
 function appendAmazonSummaryPages(
@@ -111,61 +189,115 @@ function appendAmazonSummaryPages(
 ): void {
     if (entries.length === 0) return;
 
-    const marginX = 16;
-    const marginBottom = 14;
-    const rowFontSize = Math.max(5.5, pageWidth * 0.012);
-    const rowLineHeight = rowFontSize * 1.25;
-    const rowSpacing = Math.max(2, rowFontSize * 0.22);
-    const qtyColumnWidth = 80;
-    const skuColumnWidth = Math.max(40, pageWidth - (marginX * 2) - qtyColumnWidth - 14);
+    const tableX = 16;
+    const tableWidth = pageWidth - 32;
+    const marginBottom = 18;
+    const rowFontSize = Math.max(8, pageWidth * 0.016);
+    const rowLineHeight = rowFontSize * 1.2;
+    const rowPaddingY = Math.max(2, rowFontSize * 0.24);
+    const ordColWidth = Math.min(48, tableWidth * 0.12);
+    const qtyColWidth = Math.min(48, tableWidth * 0.12);
+    const skuColWidth = Math.max(120, tableWidth - ordColWidth - qtyColWidth);
+    const skuTextWidth = Math.max(24, skuColWidth - 8);
+    const footerHeight = Math.max(20, rowFontSize * 2);
+    const borderWidth = 0.8;
 
     let page = targetPdf.addPage([pageWidth, pageHeight]);
-    let cursorY = drawAmazonSummaryHeader(page, font, pageWidth, pageHeight - 16, false);
+    let cursorY = drawAmazonSummaryHeader(page, font, pageWidth, pageHeight, false);
 
     for (const entry of entries) {
-        const skuLines = wrapTextToWidth(entry.sku, font, rowFontSize, skuColumnWidth);
+        const skuLines = wrapTextToWidth(entry.sku, font, rowFontSize, skuTextWidth);
         const safeLines = skuLines.length > 0 ? skuLines : ['-'];
-        const rowHeight = (safeLines.length * rowLineHeight) + rowSpacing;
+        const rowHeight = (safeLines.length * rowLineHeight) + (rowPaddingY * 2);
 
-        if (cursorY - rowHeight < marginBottom) {
+        if (cursorY - rowHeight < marginBottom + footerHeight) {
             page = targetPdf.addPage([pageWidth, pageHeight]);
-            cursorY = drawAmazonSummaryHeader(page, font, pageWidth, pageHeight - 16, true);
+            cursorY = drawAmazonSummaryHeader(page, font, pageWidth, pageHeight, true);
         }
 
+        const rowBottomY = cursorY - rowHeight;
+        page.drawRectangle({
+            x: tableX,
+            y: rowBottomY,
+            width: ordColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+        page.drawRectangle({
+            x: tableX + ordColWidth,
+            y: rowBottomY,
+            width: qtyColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+        page.drawRectangle({
+            x: tableX + ordColWidth + qtyColWidth,
+            y: rowBottomY,
+            width: skuColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+
+        const ordText = String(entry.orderCount);
+        const qtyText = entry.qtyPerSku;
+        const ordTextWidth = font.widthOfTextAtSize(ordText, rowFontSize);
+        const qtyTextWidth = font.widthOfTextAtSize(qtyText, rowFontSize);
+        const ordTextY = rowBottomY + ((rowHeight - rowFontSize) / 2);
+        const qtyTextY = ordTextY;
+
+        page.drawText(ordText, {
+            x: tableX + Math.max(4, (ordColWidth - ordTextWidth) / 2),
+            y: ordTextY,
+            size: rowFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+        page.drawText(qtyText, {
+            x: tableX + ordColWidth + Math.max(4, (qtyColWidth - qtyTextWidth) / 2),
+            y: qtyTextY,
+            size: rowFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+
+        const skuStartY = rowBottomY + rowHeight - rowPaddingY - rowFontSize;
         safeLines.forEach((line, index) => {
             page.drawText(line, {
-                x: marginX,
-                y: cursorY - (index * rowLineHeight),
+                x: tableX + ordColWidth + qtyColWidth + 4,
+                y: skuStartY - (index * rowLineHeight),
                 size: rowFontSize,
                 font,
                 color: rgb(0, 0, 0)
             });
         });
 
-        const qtyText = formatAmazonQty(entry.totalQty);
-        const qtyTextWidth = font.widthOfTextAtSize(qtyText, rowFontSize);
-        page.drawText(qtyText, {
-            x: pageWidth - marginX - qtyTextWidth,
-            y: cursorY,
-            size: rowFontSize,
-            font,
-            color: rgb(0, 0, 0)
-        });
-
-        cursorY -= rowHeight;
+        cursorY = rowBottomY;
     }
 
     const grandTotal = entries.reduce((sum, entry) => sum + entry.totalQty, 0);
-    if (cursorY - (rowLineHeight * 2) < marginBottom) {
+    if (cursorY - footerHeight < marginBottom) {
         page = targetPdf.addPage([pageWidth, pageHeight]);
-        cursorY = drawAmazonSummaryHeader(page, font, pageWidth, pageHeight - 16, true);
+        cursorY = drawAmazonSummaryHeader(page, font, pageWidth, pageHeight, true);
     }
 
-    const totalTextSize = Math.max(rowFontSize, pageWidth * 0.015);
-    page.drawText(`Grand Total Qty: ${formatAmazonQty(grandTotal)}`, {
-        x: marginX,
-        y: cursorY - rowLineHeight,
-        size: totalTextSize,
+    const footerBottomY = cursorY - footerHeight;
+    page.drawRectangle({
+        x: tableX,
+        y: footerBottomY,
+        width: tableWidth,
+        height: footerHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth
+    });
+
+    const totalText = `Total package: ${formatAmazonQty(grandTotal)}`;
+    page.drawText(totalText, {
+        x: tableX + 4,
+        y: footerBottomY + ((footerHeight - rowFontSize) / 2),
+        size: rowFontSize,
         font,
         color: rgb(0, 0, 0)
     });
@@ -176,24 +308,42 @@ function getAmazonQtyColumnBounds(
     descriptionHeader: PositionedTextItem
 ): { left: number; right: number } | null {
     const headerBandTolerance = 10;
-
-    const headerBandItems = positioned
-        .filter(item =>
-            Math.abs(item.y - descriptionHeader.y) <= headerBandTolerance &&
-            AMAZON_COLUMN_HEADERS.some(keyword => item.upper.includes(keyword))
-        )
-        .sort((a, b) => a.x - b.x);
-
-    const qtyHeader = headerBandItems.find(
+    const qtyCandidates = positioned.filter(
         item => item.upper.includes("QTY") || item.upper.includes("QUANTITY")
     );
 
-    if (!qtyHeader) return null;
+    if (qtyCandidates.length === 0) return null;
 
-    const nextHeader = headerBandItems.find(item => item.x > qtyHeader.x + 0.5);
+    const qtyHeader = qtyCandidates
+        .map((candidate) => {
+            const sameRowHeaders = positioned.filter(item =>
+                Math.abs(item.y - candidate.y) <= headerBandTolerance &&
+                AMAZON_COLUMN_HEADERS.some(keyword => item.upper.includes(keyword))
+            );
+
+            const rowScore = sameRowHeaders.length;
+            const distanceFromDescription = Math.abs(candidate.y - descriptionHeader.y);
+
+            return {
+                candidate,
+                sameRowHeaders: sameRowHeaders.sort((a, b) => a.x - b.x),
+                rowScore,
+                distanceFromDescription
+            };
+        })
+        .sort((a, b) => {
+            if (b.rowScore !== a.rowScore) return b.rowScore - a.rowScore;
+            return a.distanceFromDescription - b.distanceFromDescription;
+        })[0];
+
+    if (!qtyHeader || qtyHeader.rowScore === 0) return null;
+
+    const nextHeader = qtyHeader.sameRowHeaders.find(
+        item => item.x > qtyHeader.candidate.x + 0.5
+    );
     return {
-        left: qtyHeader.x - 4,
-        right: nextHeader ? nextHeader.x - 1 : qtyHeader.x + 42
+        left: qtyHeader.candidate.x - 4,
+        right: nextHeader ? nextHeader.x - 1 : qtyHeader.candidate.x + 42
     };
 }
 
@@ -201,6 +351,30 @@ function extractNumericQty(value: string): string | null {
     const cleaned = normalizeWhitespace(value);
     if (!/^\d+(?:\.\d+)?$/.test(cleaned)) return null;
     return cleaned.replace(/\.0+$/, "");
+}
+
+function extractAmazonQtyFromLine(
+    words: PositionedTextItem[],
+    qtyBounds: { left: number; right: number } | null
+): string | null {
+    const fromColumn = qtyBounds
+        ? words
+            .filter(word => word.x >= qtyBounds.left && word.x < qtyBounds.right)
+            .map(word => extractNumericQty(word.text))
+            .find(Boolean) ?? null
+        : null;
+
+    if (fromColumn) return fromColumn;
+
+    // Some invoices merge table cells into one text token (e.g. "₹253.39 2 ₹506.78 18%").
+    // Fallback to parse qty from the unit-price/qty/net-amount pattern.
+    const lineText = normalizeWhitespace(words.map(word => word.text).join(' '));
+    const inlinePriceQtyMatch = lineText.match(
+        /(?:₹|INR|RS\.?)\s*[\d,]+(?:\.\d+)?\s+(\d+(?:\.\d+)?)\s+(?:₹|INR|RS\.?)\s*[\d,]+(?:\.\d+)?/i
+    );
+
+    if (!inlinePriceQtyMatch?.[1]) return null;
+    return extractNumericQty(inlinePriceQtyMatch[1]);
 }
 
 async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy): Promise<AmazonInvoiceLabelData> {
@@ -260,12 +434,7 @@ async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy):
                 .join(' ')
         );
 
-        const lineQty = qtyBounds
-            ? line.words
-                .filter(word => word.x >= qtyBounds.left && word.x < qtyBounds.right)
-                .map(word => extractNumericQty(word.text))
-                .find(Boolean) ?? null
-            : null;
+        const lineQty = extractAmazonQtyFromLine(line.words, qtyBounds);
 
         if (hasSerialNumber) {
             if (currentItem && currentItem.parts.length > 0) {
@@ -315,13 +484,7 @@ async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy):
 
         if (fallbackDescription) {
             const fallbackQty = lines
-                .flatMap(line =>
-                    qtyBounds
-                        ? line.words
-                            .filter(word => word.x >= qtyBounds.left && word.x < qtyBounds.right)
-                            .map(word => extractNumericQty(word.text))
-                        : []
-                )
+                .map(line => extractAmazonQtyFromLine(line.words, qtyBounds))
                 .find(Boolean) ?? null;
 
             lineItems.push({
@@ -406,6 +569,7 @@ function drawAmazonDescriptionBoxOnLabelPage(
     const drawFontSize = fontSize * drawScale;
     const drawLineHeight = drawFontSize * AMAZON_DESCRIPTION_BOX.lineHeightRatio;
     const topTextLimit = boxY + boxHeight - verticalPadding;
+    const qtyHighlightPattern = /\([^)]*QTY\s*:\s*(\d+(?:\.\d+)?)[^)]*\)/ig;
 
     let textY = boxY + verticalPadding + (Math.max(0, lines.length - 1) * drawLineHeight);
 
@@ -414,13 +578,78 @@ function drawAmazonDescriptionBoxOnLabelPage(
             textY -= drawLineHeight;
             continue;
         }
-        page.drawText(line, {
-            x: boxX + horizontalPadding,
-            y: textY,
-            size: drawFontSize,
-            font,
-            color: rgb(0, 0, 0)
-        });
+
+        let cursorX = boxX + horizontalPadding;
+        let lastIndex = 0;
+        let match: RegExpExecArray | null = null;
+
+        qtyHighlightPattern.lastIndex = 0;
+        while ((match = qtyHighlightPattern.exec(line)) !== null) {
+            const fullMatch = match[0];
+            const qtyValue = Number(match[1]);
+            const matchIndex = match.index;
+            const textBefore = line.slice(lastIndex, matchIndex);
+
+            if (textBefore) {
+                page.drawText(textBefore, {
+                    x: cursorX,
+                    y: textY,
+                    size: drawFontSize,
+                    font,
+                    color: rgb(0, 0, 0)
+                });
+                cursorX += font.widthOfTextAtSize(textBefore, drawFontSize);
+            }
+
+            const shouldHighlightQty = Number.isFinite(qtyValue) && qtyValue > 1;
+            if (shouldHighlightQty) {
+                const badgePaddingX = Math.max(2.2, drawFontSize * 0.15);
+                const badgePaddingY = Math.max(1.6, drawFontSize * 0.09);
+                const badgeWidth = font.widthOfTextAtSize(fullMatch, drawFontSize) + (badgePaddingX * 2);
+                const badgeHeight = drawFontSize + (badgePaddingY * 2);
+
+                page.drawRectangle({
+                    x: cursorX,
+                    y: textY - badgePaddingY,
+                    width: badgeWidth,
+                    height: badgeHeight,
+                    color: rgb(0, 0, 0)
+                });
+
+                page.drawText(fullMatch, {
+                    x: cursorX + badgePaddingX,
+                    y: textY,
+                    size: drawFontSize,
+                    font,
+                    color: rgb(1, 1, 1)
+                });
+
+                cursorX += badgeWidth;
+            } else {
+                page.drawText(fullMatch, {
+                    x: cursorX,
+                    y: textY,
+                    size: drawFontSize,
+                    font,
+                    color: rgb(0, 0, 0)
+                });
+                cursorX += font.widthOfTextAtSize(fullMatch, drawFontSize);
+            }
+
+            lastIndex = matchIndex + fullMatch.length;
+        }
+
+        const trailingText = line.slice(lastIndex);
+        if (trailingText) {
+            page.drawText(trailingText, {
+                x: cursorX,
+                y: textY,
+                size: drawFontSize,
+                font,
+                color: rgb(0, 0, 0)
+            });
+        }
+
         textY -= drawLineHeight;
     }
 }
@@ -432,64 +661,117 @@ export async function processAmazon(
     options: ProcessorOptions
 ): Promise<void> {
     const copiedPages = await targetPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
-    const amazonSummaryMap = new Map<string, number>();
+    const amazonSummaryMap = new Map<string, { orderCount: number; totalQty: number; qtyValues: Set<string> }>();
+    if (options.helveticaFont) await targetPdf.embedFont(StandardFonts.HelveticaBold);
+    const processTimeStamp = formatProcessTimestamp(new Date());
+
+    const labelsToInclude: { page: PDFPage, totalQty: number }[] = [];
 
     for (let i = 0; i < copiedPages.length; i += 2) {
         const page = copiedPages[i];
+        let totalOrderQty = 1;
+
+        if (options.includeDateTimeOnLabel && options.helveticaFont) {
+            const { x: cropX, y: cropY } = page.getCropBox();
+            const dateTimeText = `- Amazon Lable Processed At - ${processTimeStamp}`;
+            page.drawText(dateTimeText, {
+                x: cropX + 6,
+                y: cropY + 6,
+                size: 8.4,
+                font: options.helveticaFont,
+                color: rgb(0, 0, 0)
+            });
+        }
 
         if (i + 1 < copiedPages.length && options.originalDocProxy && options.helveticaFont) {
             try {
                 const invoicePage = await options.originalDocProxy.getPage(i + 2);
-                const { lineItems } = await extractAmazonDescriptionFromInvoicePage(invoicePage);
+                const invoiceText = await extractTextFromPage(invoicePage);
+                
+                if (isAmazonInvoicePageText(invoiceText)) {
+                    const { lineItems } = await extractAmazonDescriptionFromInvoicePage(invoicePage);
+                    totalOrderQty = lineItems.reduce((sum, item) => sum + parseAmazonQty(item.quantity), 0);
 
-                if (options.includeAmazonOrderSummary) {
-                    for (const lineItem of lineItems) {
-                        const sku = getAmazonLineBaseText(lineItem.description, 'WITH_SKU');
-                        if (!sku) continue;
-                        const qty = parseAmazonQty(lineItem.quantity);
-                        amazonSummaryMap.set(sku, (amazonSummaryMap.get(sku) ?? 0) + qty);
+                    if (options.includeAmazonOrderSummary) {
+                        for (const lineItem of lineItems) {
+                            const sku = getAmazonLineBaseText(lineItem.description, 'WITH_SKU');
+                            if (!sku) continue;
+                            const qty = parseAmazonQty(lineItem.quantity);
+
+                            const existing = amazonSummaryMap.get(sku) ?? {
+                                orderCount: 0,
+                                totalQty: 0,
+                                qtyValues: new Set<string>()
+                            };
+                            existing.orderCount += 1;
+                            existing.totalQty += qty;
+                            existing.qtyValues.add(formatAmazonQty(qty));
+                            amazonSummaryMap.set(sku, existing);
+                        }
                     }
-                }
 
-                const formattedLines = lineItems
-                    .map((lineItem) => {
-                        const normalizedBase = getAmazonLineBaseText(
-                            lineItem.description,
-                            options.amazonDescriptionMode || 'WITH_SKU'
+                    const formattedLines = lineItems
+                        .map((lineItem) => {
+                            const normalizedBase = getAmazonLineBaseText(
+                                lineItem.description,
+                                options.amazonDescriptionMode || 'WITH_SKU'
+                            );
+                            if (!normalizedBase) return "";
+
+                            const qtySuffix = lineItem.quantity ? `(Qty : ${lineItem.quantity})` : "";
+                            return qtySuffix
+                                ? `${normalizedBase} ${qtySuffix}`
+                                : normalizedBase;
+                        })
+                        .filter(Boolean);
+
+                    const finalDescription = formattedLines.join('\n');
+                    if (finalDescription) {
+                        drawAmazonDescriptionBoxOnLabelPage(
+                            page,
+                            finalDescription,
+                            options.helveticaFont
                         );
-                        if (!normalizedBase) return "";
-
-                        const qtySuffix = lineItem.quantity ? `(Qty : ${lineItem.quantity})` : "";
-                        return qtySuffix
-                            ? `${normalizedBase} ${qtySuffix}`
-                            : normalizedBase;
-                    })
-                    .filter(Boolean);
-
-                const finalDescription = formattedLines.join('\n');
-
-                if (finalDescription) {
-                    drawAmazonDescriptionBoxOnLabelPage(
-                        page,
-                        finalDescription,
-                        options.helveticaFont
-                    );
+                    }
                 }
             } catch (e) {
                 console.warn("Failed to process Amazon description pair for page", i, e);
             }
         }
 
-        targetPdf.addPage(page);
+        labelsToInclude.push({ page, totalQty: totalOrderQty });
     }
 
-    if (options.includeAmazonOrderSummary && options.helveticaFont && copiedPages.length > 0) {
-        const firstPage = copiedPages[0];
-        const { width: pageWidth, height: pageHeight } = firstPage.getSize();
-        const summaryEntries = [...amazonSummaryMap.entries()]
-            .map(([sku, totalQty]) => ({ sku, totalQty }))
-            .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true }));
+    // Sorting by QTY if enabled
+    if (options.includeMultiQtySummary) {
+        labelsToInclude.sort((a, b) => a.totalQty - b.totalQty);
+    }
 
-        appendAmazonSummaryPages(targetPdf, summaryEntries, options.helveticaFont, pageWidth, pageHeight);
+    // Add all processed label pages to the target PDF
+    for (const item of labelsToInclude) {
+        targetPdf.addPage(item.page);
+    }
+
+    // Summary Page (Pick List)
+    if (options.includeAmazonOrderSummary && options.helveticaFont && labelsToInclude.length > 0) {
+        const orderCount = labelsToInclude.length;
+        const threshold = options.summaryThreshold ?? 0;
+
+        if (orderCount >= threshold) {
+            const firstPage = labelsToInclude[0].page;
+            const { width: pageWidth, height: pageHeight } = firstPage.getSize();
+            const summaryEntries = [...amazonSummaryMap.entries()]
+                .map(([sku, summary]) => ({
+                    sku,
+                    orderCount: summary.orderCount,
+                    qtyPerSku: summary.qtyValues.size === 1
+                        ? [...summary.qtyValues][0]
+                        : "Mix",
+                    totalQty: summary.totalQty
+                }))
+                .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true }));
+
+            appendAmazonSummaryPages(targetPdf, summaryEntries, options.helveticaFont, pageWidth, pageHeight);
+        }
     }
 }

@@ -2,10 +2,10 @@ import type { CropConfig } from './types';
 
 export const LABEL_CONFIGS: Record<string, CropConfig> = {
     FLIPKART: {
-        tlx: 188,
-        tly: 28,
-        brx: 407,
-        bry: 381,
+        tlx: 186,
+        tly: 27,
+        brx: 408,
+        bry: 384,
         label: "Flipkart",
         logo: "./Flipkart.jpg"
     },

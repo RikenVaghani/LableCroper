@@ -141,3 +141,16 @@ export function wrapTextToWidth(text: string, font: PDFFont, fontSize: number, m
 
     return lines;
 }
+
+export function formatProcessTimestamp(date: Date): string {
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(date.getFullYear());
+    const hour24 = date.getHours();
+    const period = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 || 12;
+    const hh = String(hour12).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+    return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss} ${period}`;
+}

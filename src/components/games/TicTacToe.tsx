@@ -161,7 +161,7 @@ export function TicTacToe() {
           onClick={() => { setGameMode('PVC'); resetGame(); }}
           className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-xl transition-all ${gameMode === 'PVC' ? 'bg-white dark:bg-slate-700 text-purple-600 shadow-sm' : 'text-slate-500'}`}
         >
-          <Cpu className="h-4 w-4" /> Vs CPU
+          <Cpu className="h-4 w-4" /> Vs p
         </button>
         <button
           onClick={() => { setGameMode('PVP'); resetGame(); }}

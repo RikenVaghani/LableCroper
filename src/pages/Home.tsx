@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Scissors, FileText, ArrowRight, Gamepad2 } from 'lucide-react'
+import { Scissors, FileText, ArrowRight, Gamepad2, StickyNote } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export function Home() {
@@ -17,6 +17,13 @@ export function Home() {
       icon: <FileText className="h-8 w-8 text-indigo-600" />,
       path: '/PDFTools',
       color: 'bg-indigo-50'
+    },
+    {
+      title: 'Online Notepad',
+      description: 'Quickly jot down notes, draft content, or save text snippets. Everything is saved locally in your browser for maximum privacy.',
+      icon: <StickyNote className="h-8 w-8 text-amber-600" />,
+      path: '/Notepad',
+      color: 'bg-amber-50'
     },
     {
       title: 'Mini Games',
