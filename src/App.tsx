@@ -9,6 +9,7 @@ const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })))
 const LabelCropper = lazy(() => import('./pages/LabelCropper').then(m => ({ default: m.LabelCropper })))
 const PDFTools = lazy(() => import('./pages/PDFTools').then(m => ({ default: m.PDFTools })))
 const Games = lazy(() => import('./pages/Games').then(m => ({ default: m.Games })))
+const Notepad = lazy(() => import('./pages/Notepad').then(m => ({ default: m.Notepad })))
 
 const LoadingFallback = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -23,9 +24,10 @@ function App() {
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/LableCroper" element={<LabelCropper />} />
+            <Route path="/LabelCropper" element={<LabelCropper />} />
             <Route path="/PDFTools" element={<PDFTools />} />
             <Route path="/Games" element={<Games />} />
+            <Route path="/Notepad" element={<Notepad />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

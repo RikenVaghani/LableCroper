@@ -4,7 +4,7 @@ import { Upload, AlertCircle } from 'lucide-react'
 import { cn } from '../utils/cn'
 
 interface FileUploaderProps {
-  onFileSelect: (file: File) => void
+  onFilesSelect: (files: File[]) => void
   className?: string
   multiple?: boolean
   title?: string
@@ -16,7 +16,7 @@ interface FileUploaderProps {
 }
 
 export function FileUploader({
-  onFileSelect,
+  onFilesSelect,
   className,
   multiple = false,
   title = 'Upload Shipping Labels',
@@ -31,10 +31,10 @@ export function FileUploader({
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        acceptedFiles.forEach(file => onFileSelect(file))
+        onFilesSelect(acceptedFiles)
       }
     },
-    [onFileSelect]
+    [onFilesSelect]
   )
 
   const { getRootProps, getInputProps, isDragActive, isDragReject, fileRejections } = useDropzone({
