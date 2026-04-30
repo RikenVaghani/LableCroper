@@ -7,7 +7,6 @@ interface Tile {
   value: number;
   x: number;
   y: number;
-  mergedFrom?: Tile[];
 }
 
 export function Game2048() {
@@ -18,6 +17,7 @@ export function Game2048() {
   });
   const [gameOver, setGameOver] = useState(false);
   const [gameWon, setGameWon] = useState(false);
+  const [gridSize, setGridSize] = useState(4);
   const containerRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(0);
 
@@ -35,36 +35,59 @@ export function Game2048() {
     2048: 'bg-[#1c0b19]',
   };
 
-  const initGame = useCallback(() => {
+  const createTile = useCallback((pos: { x: number, y: number }): Tile => ({
+    id: nextId.current++,
+    value: Math.random() < 0.9 ? 2 : 4,
+    x: pos.x,
+    y: pos.y,
+  }), []);
+
+  const getRandomEmptyPos = useCallback((currentTiles: Tile[], size: number = gridSize) => {
+    const emptyPos: { x: number; y: number }[] = [];
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        if (!currentTiles.some(t => t.x === x && t.y === y)) {
+          emptyPos.push({ x, y });
+        }
+      }
+    }
+    if (emptyPos.length === 0) return null;
+    return emptyPos[Math.floor(Math.random() * emptyPos.length)];
+  }, [gridSize]);
+
+  const canMove = (currentTiles: Tile[], size: number) => {
+    if (currentTiles.length < size * size) return true;
+    for (const tile of currentTiles) {
+      const right = currentTiles.find(t => t.x === tile.x + 1 && t.y === tile.y);
+      const down = currentTiles.find(t => t.x === tile.x && t.y === tile.y + 1);
+      if ((right && right.value === tile.value) || (down && down.value === tile.value)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const initGame = useCallback((size: number = gridSize) => {
     setTiles([]);
     setScore(0);
     setGameOver(false);
     setGameWon(false);
     
     // Add two initial tiles
-    const firstTile = createTile(getRandomEmptyPos([]));
-    const secondTile = createTile(getRandomEmptyPos([firstTile]));
-    setTiles([firstTile, secondTile]);
-  }, []);
-
-  const createTile = (pos: { x: number, y: number }): Tile => ({
-    id: nextId.current++,
-    value: Math.random() < 0.9 ? 2 : 4,
-    x: pos.x,
-    y: pos.y,
-  });
-
-  const getRandomEmptyPos = (currentTiles: Tile[]) => {
-    const emptyPos = [];
-    for (let x = 0; x < 4; x++) {
-      for (let y = 0; y < 4; y++) {
-        if (!currentTiles.some(t => t.x === x && t.y === y)) {
-          emptyPos.push({ x, y });
-        }
-      }
+    const firstPos = getRandomEmptyPos([], size);
+    if (!firstPos) {
+      setTiles([]);
+      return;
     }
-    return emptyPos[Math.floor(Math.random() * emptyPos.length)];
-  };
+    const firstTile = createTile(firstPos);
+    const secondPos = getRandomEmptyPos([firstTile], size);
+    if (!secondPos) {
+      setTiles([firstTile]);
+      return;
+    }
+    const secondTile = createTile(secondPos);
+    setTiles([firstTile, secondTile]);
+  }, [gridSize, createTile, getRandomEmptyPos]);
 
   const move = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (gameOver || gameWon) return;
@@ -72,29 +95,27 @@ export function Game2048() {
     setTiles(prevTiles => {
       let hasChanged = false;
       const newTiles: Tile[] = [];
-      // const scoreIncrement = 0;
-      let currentScore = score;
+      let scoreIncrement = 0;
 
       const isVertical = direction === 'up' || direction === 'down';
       const isForward = direction === 'right' || direction === 'down';
 
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < gridSize; i++) {
         const line = prevTiles.filter(t => (isVertical ? t.x === i : t.y === i))
           .sort((a, b) => isForward ? (isVertical ? b.y - a.y : b.x - a.x) : (isVertical ? a.y - b.y : a.x - b.x));
 
-        let nextLine: Tile[] = [];
+        const nextLine: Tile[] = [];
         for (let j = 0; j < line.length; j++) {
           const tile = { ...line[j] };
           if (j < line.length - 1 && line[j].value === line[j+1].value) {
             // Merge
             tile.value *= 2;
-            tile.mergedFrom = [line[j], line[j+1]];
-            currentScore += tile.value;
+            scoreIncrement += tile.value;
             j++; // skip next
             hasChanged = true;
           }
           
-          const newPos = isForward ? 3 - nextLine.length : nextLine.length;
+          const newPos = isForward ? gridSize - 1 - nextLine.length : nextLine.length;
           if (isVertical) {
             if (tile.y !== newPos) hasChanged = true;
             tile.y = newPos;
@@ -108,30 +129,28 @@ export function Game2048() {
       }
 
       if (hasChanged) {
-        const nextTile = createTile(getRandomEmptyPos(newTiles));
-        const finalTiles = [...newTiles, nextTile];
-        
-        setScore(currentScore);
-        if (currentScore > bestScore) {
-          setBestScore(currentScore);
-          localStorage.setItem('2048-best-score', currentScore.toString());
-        }
+        const nextPos = getRandomEmptyPos(newTiles, gridSize);
+        const finalTiles = nextPos ? [...newTiles, createTile(nextPos)] : [...newTiles];
 
-        // Check game over
-        if (finalTiles.length === 16) {
-          // Check if any moves possible
-          // (simplified check for now)
-        }
-        
+        setScore(prev => {
+          const nextScore = prev + scoreIncrement;
+          if (nextScore > bestScore) {
+            setBestScore(nextScore);
+            localStorage.setItem('2048-best-score', nextScore.toString());
+          }
+          return nextScore;
+        });
+
         if (finalTiles.some(t => t.value === 2048)) {
           setGameWon(true);
         }
+        setGameOver(!canMove(finalTiles, gridSize));
 
         return finalTiles;
       }
       return prevTiles;
     });
-  }, [gameOver, gameWon, score, bestScore]);
+  }, [gameOver, gameWon, bestScore, gridSize, createTile, getRandomEmptyPos]);
 
   useEffect(() => {
     initGame();
@@ -139,6 +158,9 @@ export function Game2048() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+      }
       switch (e.key) {
         case 'ArrowUp': move('up'); break;
         case 'ArrowDown': move('down'); break;
@@ -166,6 +188,9 @@ export function Game2048() {
     }
   }, [move]);
 
+  const GAP_PX = 12;
+  const cellSize = `calc((100% - ${(gridSize - 1) * GAP_PX}px) / ${gridSize})`;
+
   return (
     <div className="flex flex-col items-center justify-center space-y-6 w-full max-w-md mx-auto">
       <div className="flex justify-between items-center w-full">
@@ -183,11 +208,23 @@ export function Game2048() {
       </div>
 
       <div className="flex justify-between w-full items-center">
-        <p className="text-slate-500 dark:text-slate-400 text-sm">
-          Join the numbers to get to the <strong>2048</strong> tile!
-        </p>
+        <div className="flex gap-2">
+          {[4, 5, 6].map(size => (
+            <button
+              key={size}
+              onClick={() => { setGridSize(size); initGame(size); }}
+              className={`px-3 py-1 text-sm rounded-lg font-bold transition-colors ${
+                gridSize === size 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700'
+              }`}
+            >
+              {size}x{size}
+            </button>
+          ))}
+        </div>
         <button 
-          onClick={initGame}
+          onClick={() => initGame(gridSize)}
           className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-bold transition-colors"
         >
           New Game
@@ -199,8 +236,11 @@ export function Game2048() {
         className="relative aspect-square w-full bg-slate-200 dark:bg-slate-800 rounded-2xl p-3 shadow-inner touch-none overflow-hidden"
       >
         {/* Grid Background */}
-        <div className="grid grid-cols-4 grid-rows-4 gap-3 w-full h-full">
-          {Array.from({ length: 16 }).map((_, i) => (
+        <div 
+          className="grid gap-3 w-full h-full"
+          style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${gridSize}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: gridSize * gridSize }).map((_, i) => (
             <div key={i} className="bg-slate-300/50 dark:bg-slate-700/50 rounded-xl w-full h-full" />
           ))}
         </div>
@@ -216,8 +256,8 @@ export function Game2048() {
                 animate={{ 
                   scale: 1, 
                   opacity: 1,
-                  x: `${tile.x * 100}%`,
-                  y: `${tile.y * 100}%`,
+                  x: `calc(${tile.x} * (100% + ${GAP_PX}px))`,
+                  y: `calc(${tile.y} * (100% + ${GAP_PX}px))`
                 }}
                 transition={{
                   type: 'spring',
@@ -225,7 +265,13 @@ export function Game2048() {
                   damping: 30,
                   mass: 1
                 }}
-                className="absolute w-1/4 h-1/4 p-1.5"
+                className="absolute p-1.5"
+                style={{
+                  width: cellSize,
+                  height: cellSize,
+                  left: 0,
+                  top: 0
+                }}
               >
                 <div className={`w-full h-full rounded-xl flex items-center justify-center text-2xl font-black text-white shadow-lg ${colors[tile.value] || 'bg-slate-900'}`}>
                   {tile.value}
@@ -247,7 +293,7 @@ export function Game2048() {
                 {gameWon ? '🎉 You Won!' : 'Game Over!'}
               </h2>
               <button 
-                onClick={initGame}
+                onClick={() => initGame(gridSize)}
                 className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all active:scale-95"
               >
                 Try Again
@@ -259,6 +305,32 @@ export function Game2048() {
 
       <div className="w-full text-slate-400 text-xs text-center">
         Use Arrow keys, WASD, or Swipe to move the tiles.
+      </div>
+
+      <div className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-4">
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-3">Difficulty Guide</h3>
+        <div className="space-y-2 text-xs">
+          <div className="grid grid-cols-3 gap-2 font-semibold text-slate-500 dark:text-slate-400">
+            <span>Grid Size</span>
+            <span>Difficulty</span>
+            <span>Notes</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-slate-700 dark:text-slate-300">
+            <span className="font-semibold">4x4</span>
+            <span>Standard</span>
+            <span>Classic 2048 rules.</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-slate-700 dark:text-slate-300">
+            <span className="font-semibold">5x5</span>
+            <span>Easier</span>
+            <span>More space for longer survival and higher scores.</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-slate-700 dark:text-slate-300">
+            <span className="font-semibold">6x6</span>
+            <span>Much Easier</span>
+            <span>Most forgiving board, often reaching very high tiles.</span>
+          </div>
+        </div>
       </div>
     </div>
   );
