@@ -23,11 +23,14 @@ import {
   Info, 
   Settings,
   ChevronRight,
+  GitMerge,
   type LucideIcon
 } from 'lucide-react'
 import { cn } from '../utils/cn'
 
 type PlatformKey = keyof typeof LABEL_CONFIGS
+
+type LabelMode = 'CROP' | 'MERGE_AND_CROP'
 
 type DownloadItem = {
   name: string
@@ -54,6 +57,26 @@ const PLATFORM_UI_CONFIG: Record<PlatformKey, {
     icon: Box,
     iconClassName: 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300',
     description: 'Extract descriptions and order summaries from Amazon label PDFs.'
+  }
+};
+
+const MODE_UI_CONFIG: Record<LabelMode, {
+  icon: LucideIcon;
+  iconClassName: string;
+  label: string;
+  hoverText: string;
+}> = {
+  CROP: {
+    icon: Scissors,
+    iconClassName: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300',
+    label: 'Single Lable Output',
+    hoverText: 'Single-Single Lable file as output'
+  },
+  MERGE_AND_CROP: {
+    icon: GitMerge,
+    iconClassName: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300',
+    label: 'Merge & Lable Process',
+    hoverText: 'All File Merge Then Lable Process as single file'
   }
 };
 
@@ -263,6 +286,9 @@ export function LabelCropper() {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     savedSettings?.selectedVariantId !== undefined ? savedSettings.selectedVariantId : initialDefaults.variantId
   )
+  const [labelMode, setLabelMode] = useState<LabelMode>(
+    savedSettings?.labelMode || 'CROP'
+  )
   const [selectedOptions, setSelectedOptions] = useState<string[]>(
     savedSettings?.selectedOptions || initialDefaults.options
   )
@@ -284,13 +310,16 @@ export function LabelCropper() {
   const [includePageNumbers, setIncludePageNumbers] = useState(
     !!savedSettings?.includePageNumbers
   )
-  const [includeDateTimeOnLabel, setIncludeDateTimeOnLabel] = useState(
+  const [includeDateTimeOnLabel] = useState(
     !!savedSettings?.includeDateTimeOnLabel
   )
   const [summaryThreshold, setSummaryThreshold] = useState<number>(
     savedSettings?.summaryThreshold ?? 1
   )
-  const [showMultiQtyOnBottom, setShowMultiQtyOnBottom] = useState(
+  const [summaryOrientation] = useState<'portrait' | 'landscape'>(
+    savedSettings?.summaryOrientation || 'portrait'
+  )
+  const [showMultiQtyOnBottom] = useState(
     !!savedSettings?.showMultiQtyOnBottom
   )
   const [includeMultiQtySummary, setIncludeMultiQtySummary] = useState(
@@ -321,9 +350,11 @@ export function LabelCropper() {
       includePageNumbers,
       includeDateTimeOnLabel,
       summaryThreshold,
+      summaryOrientation,
       showMultiQtyOnBottom,
       includeMultiQtySummary,
-      orderMeeshoByDeliveryPartner
+      orderMeeshoByDeliveryPartner,
+      labelMode
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
   }, [
@@ -337,12 +368,15 @@ export function LabelCropper() {
     includePageNumbers,
     includeDateTimeOnLabel,
     summaryThreshold,
+    summaryOrientation,
     showMultiQtyOnBottom,
     includeMultiQtySummary,
-    orderMeeshoByDeliveryPartner
+    orderMeeshoByDeliveryPartner,
+    labelMode
   ])
   
   const optionsRef = useRef<HTMLDivElement>(null)
+  const processButtonRef = useRef<HTMLDivElement>(null)
 
   const scrollToOptions = () => {
     optionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -360,6 +394,10 @@ export function LabelCropper() {
       setFiles([])
       setGeneratedFiles([])
     }
+  }
+
+  const handleLabelModeChange = (mode: LabelMode) => {
+    setLabelMode(mode)
   }
 
   const handlePlatformChange = (platform: PlatformKey) => {
@@ -404,6 +442,9 @@ export function LabelCropper() {
       if (runId === detectionRunRef.current) {
         setIsDetectingPlatform(false)
       }
+      setTimeout(() => {
+        processButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
     }
   }
 
@@ -476,7 +517,7 @@ export function LabelCropper() {
       const batchTimestamp = buildTimestamp()
       const processedDocs: PDFDocument[] = []
 
-      if (mergeAllFiles && selectedPlatform === 'MEESHO' && files.length > 1) {
+      if (mergeAllFiles && files.length > 1) {
         const mergedSourcePdf = await mergePDFs(files)
         const processedMergedPdf = await cropLabels(
           mergedSourcePdf,
@@ -492,6 +533,7 @@ export function LabelCropper() {
           includePageNumbers,
           includeDateTimeOnLabel,
           summaryThreshold,
+          summaryOrientation,
           showMultiQtyOnBottom,
           includeMultiQtySummary,
           orderMeeshoByDeliveryPartner
@@ -527,6 +569,7 @@ export function LabelCropper() {
           includePageNumbers,
           includeDateTimeOnLabel,
           summaryThreshold,
+          summaryOrientation,
           showMultiQtyOnBottom,
           includeMultiQtySummary,
           orderMeeshoByDeliveryPartner
@@ -603,27 +646,58 @@ export function LabelCropper() {
 
 
       {/* Mode Selection */}
-      {/* <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Select Mode</p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {(['CROP', 'MERGE_AND_CROP'] as LabelMode[]).map(mode => {
             const config = MODE_UI_CONFIG[mode]
+            const Icon = config.icon
             return (
-              <SelectionCard
+              <label
                 key={mode}
-                isActive={labelMode === mode}
-                onClick={() => handleLabelModeChange(mode)}
-                icon={config.icon}
-                iconClassName={config.iconClassName}
-                label={config.label}
-                description={config.hoverText}
-                hoverText={config.hoverText}
-              />
+                className={cn(
+                  'flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition',
+                  labelMode === mode
+                    ? 'border-sky-600 bg-sky-50 dark:bg-sky-900/20 ring-1 ring-sky-600'
+                    : 'border-slate-300 dark:border-slate-700 hover:border-sky-300 bg-slate-50/60 dark:bg-slate-800/60'
+                )}
+              >
+                <div className={cn(
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                  config.iconClassName
+                )}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className={cn(
+                    'block text-sm font-semibold',
+                    labelMode === mode ? 'text-sky-700 dark:text-sky-300' : 'text-slate-900 dark:text-slate-100'
+                  )}>
+                    {config.label}
+                  </span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                    {config.hoverText}
+                  </span>
+                </div>
+                <div className={cn(
+                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                  labelMode === mode ? 'border-sky-600 bg-sky-600' : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800'
+                )}>
+                  {labelMode === mode && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </div>
+                <input
+                  type="radio"
+                  name="labelMode"
+                  value={mode}
+                  checked={labelMode === mode}
+                  onChange={() => handleLabelModeChange(mode)}
+                  className="hidden"
+                />
+              </label>
             )
           })}
         </div>
       </section>
- */}
 
     
 
@@ -669,64 +743,24 @@ export function LabelCropper() {
           </p>
         )}
 
-        <div className="mt-5 flex justify-center">
-          {files.length > 1 ? (
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                onClick={() => handleProcess(false)}
-                disabled={isProcessing || files.length === 0 || !selectedPlatform}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Scissors className="h-4 w-4" />
-                    Single PDF Output
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={() => handleProcess(true)}
-                disabled={isProcessing || files.length === 0 || !selectedPlatform}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sky-600 px-5 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 dark:border-sky-500 dark:text-sky-300 dark:hover:bg-sky-900/20 dark:disabled:border-slate-800 dark:disabled:text-slate-600"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Scissors className="h-4 w-4" />
-                    Merge and Process
-                  </>
-                )}
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => handleProcess(false)}
-              disabled={isProcessing || files.length === 0 || !selectedPlatform}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Scissors className="h-4 w-4" />
-                  Run Cropper
-                </>
-              )}
-            </button>
-          )}
+        <div ref={processButtonRef} className="mt-6 flex justify-center">
+          <button
+            onClick={() => handleProcess(labelMode === 'MERGE_AND_CROP')}
+            disabled={isProcessing || files.length === 0 || !selectedPlatform}
+            className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl bg-sky-600 px-8 text-base font-bold text-white shadow-md transition-all hover:scale-[1.02] hover:bg-sky-700 hover:shadow-lg disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:scale-100 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Scissors className="h-4 w-4" />
+                Process & Crop Lable / Files 
+              </>
+            )}
+          </button>
         </div>
 
         {/* File Queue */}
@@ -809,7 +843,6 @@ export function LabelCropper() {
                 onThresholdChange={setSummaryThreshold}
               />
               <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
-              <ToggleOption label="Add Date Time On Lable" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
             </div>
           </section>
@@ -857,9 +890,9 @@ export function LabelCropper() {
                 threshold={summaryThreshold}
                 onThresholdChange={setSummaryThreshold}
               />
+              
+
               <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
-              <ToggleOption label="Add Date Time On Lable" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
-              <ToggleOption label="Multi Ord QTY on Bottom" checked={showMultiQtyOnBottom} onChange={setShowMultiQtyOnBottom} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
               <ToggleOption label="Order by Delivery Partner" checked={orderMeeshoByDeliveryPartner} onChange={setOrderMeeshoByDeliveryPartner} />
             </div>
@@ -909,8 +942,6 @@ export function LabelCropper() {
                     onThresholdChange={setSummaryThreshold}
                   />
                   <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
-                  <ToggleOption label="Add Date Time On Lable" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
-                  <ToggleOption label="Multi Ord QTY on Bottom" checked={showMultiQtyOnBottom} onChange={setShowMultiQtyOnBottom} />
                   <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
                 </div>
             </section>

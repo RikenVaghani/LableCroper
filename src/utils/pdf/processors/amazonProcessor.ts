@@ -80,7 +80,15 @@ function isLikelyProcessedAmazonOutput(text: string): boolean {
 }
 
 function isAmazonInvoicePageText(text: string): boolean {
-    return !isLikelyProcessedAmazonOutput(text);
+    const normalized = normalizeWhitespace(text).toUpperCase();
+    if (!normalized || isLikelyProcessedAmazonOutput(normalized)) return false;
+
+    const hasDescription = normalized.includes(AMAZON_DESCRIPTION_HEADER);
+    const hasTotal = normalized.includes(AMAZON_TOTAL_MARKER);
+    const hasQty = normalized.includes("QTY") || normalized.includes("QUANTITY");
+
+    // Invoice pages reliably contain the tabular markers together.
+    return hasDescription && hasTotal && hasQty;
 }
 
 function drawAmazonSummaryHeader(
@@ -293,7 +301,7 @@ function appendAmazonSummaryPages(
         borderWidth
     });
 
-    const totalText = `Total package: ${formatAmazonQty(grandTotal)}`;
+    const totalText = `Total Order : ${formatAmazonQty(grandTotal)}`;
     page.drawText(totalText, {
         x: tableX + 4,
         y: footerBottomY + ((footerHeight - rowFontSize) / 2),
@@ -667,7 +675,29 @@ export async function processAmazon(
 
     const labelsToInclude: { page: PDFPage, totalQty: number }[] = [];
 
-    for (let i = 0; i < copiedPages.length; i += 2) {
+    const pageInvoiceFlags: boolean[] = [];
+    if (options.originalDocProxy) {
+        for (let pageNo = 1; pageNo <= copiedPages.length; pageNo++) {
+            try {
+                const sourcePage = await options.originalDocProxy.getPage(pageNo);
+                const sourceText = await extractTextFromPage(sourcePage);
+                pageInvoiceFlags.push(isAmazonInvoicePageText(sourceText));
+            } catch {
+                pageInvoiceFlags.push(false);
+            }
+        }
+    } else {
+        for (let pageNo = 1; pageNo <= copiedPages.length; pageNo++) {
+            pageInvoiceFlags.push(false);
+        }
+    }
+
+    for (let i = 0; i < copiedPages.length; i++) {
+        // Skip standalone invoice pages; they belong to the nearest preceding label page.
+        if (pageInvoiceFlags[i]) {
+            continue;
+        }
+
         const page = copiedPages[i];
         let totalOrderQty = 1;
 
@@ -683,14 +713,18 @@ export async function processAmazon(
             });
         }
 
-        if (i + 1 < copiedPages.length && options.originalDocProxy && options.helveticaFont) {
-            try {
-                const invoicePage = await options.originalDocProxy.getPage(i + 2);
-                const invoiceText = await extractTextFromPage(invoicePage);
-                
-                if (isAmazonInvoicePageText(invoiceText)) {
+        if (options.originalDocProxy && options.helveticaFont) {
+            // Group one label with all immediately following invoice pages.
+            for (let invoiceIndex = i + 1; invoiceIndex < copiedPages.length; invoiceIndex++) {
+                if (!pageInvoiceFlags[invoiceIndex]) {
+                    break;
+                }
+
+                try {
+                    const invoicePage = await options.originalDocProxy.getPage(invoiceIndex + 1);
                     const { lineItems } = await extractAmazonDescriptionFromInvoicePage(invoicePage);
-                    totalOrderQty = lineItems.reduce((sum, item) => sum + parseAmazonQty(item.quantity), 0);
+                    const invoiceQty = lineItems.reduce((sum, item) => sum + parseAmazonQty(item.quantity), 0);
+                    totalOrderQty = Math.max(totalOrderQty, invoiceQty);
 
                     if (options.includeAmazonOrderSummary) {
                         for (const lineItem of lineItems) {
@@ -733,9 +767,9 @@ export async function processAmazon(
                             options.helveticaFont
                         );
                     }
+                } catch (e) {
+                    console.warn("Failed to process Amazon description for page", invoiceIndex, e);
                 }
-            } catch (e) {
-                console.warn("Failed to process Amazon description pair for page", i, e);
             }
         }
 

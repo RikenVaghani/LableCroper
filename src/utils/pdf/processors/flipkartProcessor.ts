@@ -1,6 +1,6 @@
 import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
 import type { ProcessorOptions, CropConfig, FlipkartSummaryEntry } from '../types';
-import { extractTextFromPage, wrapTextToWidth, formatProcessTimestamp } from '../commonUtils';
+import { extractTextFromPage, wrapTextToWidth } from '../commonUtils';
 
 type FlipkartInvoiceLineData = {
     sku: string;
@@ -59,11 +59,14 @@ function extractFlipkartInvoiceLineData(text: string): FlipkartInvoiceLineData |
     const sku = skuAndDescriptionMatch[1].trim();
     const description = skuAndDescriptionMatch[2].trim();
 
-    const qtyHeaderIndex = normalizedText.toUpperCase().indexOf("QTY");
+    // Parse quantity from the area immediately after SKU/description block to avoid
+    // accidentally reading unrelated numeric fields from other sections.
+    const qtySearchText = `${invoiceBlock} ${normalizedText}`;
+    const qtyHeaderIndex = qtySearchText.toUpperCase().indexOf("QTY");
     let qty = 1;
     if (qtyHeaderIndex >= 0) {
-        const qtySlice = normalizedText.slice(qtyHeaderIndex, qtyHeaderIndex + 80);
-        const qtyMatch = qtySlice.match(/QTY\s*:?\s*(\d+)/i);
+        const qtySlice = qtySearchText.slice(qtyHeaderIndex, qtyHeaderIndex + 120);
+        const qtyMatch = qtySlice.match(/QTY\s*:?\s*(\d{1,3})\b/i);
         if (qtyMatch) {
             qty = parseInt(qtyMatch[1], 10);
         }
@@ -84,11 +87,11 @@ function drawFlipkartSummaryHeader(
     isContinuation: boolean,
     columnLabel: string
 ): number {
-    const tableX = 16;
-    const tableWidth = pageWidth - 32;
-    const tableTopY = pageHeight - 20;
-    const headlineRowHeight = 22;
-    const headerRowHeight = 20;
+    const tableX = 8;
+    const tableWidth = pageWidth - 16;
+    const tableTopY = pageHeight - 2;
+    const headlineRowHeight = 11;
+    const headerRowHeight = 10;
     const ordColWidth = Math.min(48, tableWidth * 0.12);
     const qtyColWidth = Math.min(48, tableWidth * 0.12);
     const skuColWidth = Math.max(120, tableWidth - ordColWidth - qtyColWidth);
@@ -117,7 +120,7 @@ function drawFlipkartSummaryHeader(
     });
 
     page.drawText(headlineText, {
-        x: tableX + 4,
+        x: tableX + 2,
         y: headlineBottomY + ((headlineRowHeight - headlineFontSize) / 2),
         size: headlineFontSize,
         font,
@@ -149,23 +152,25 @@ function drawFlipkartSummaryHeader(
         borderWidth: 0.8
     });
 
+    const headerTextY = headerBottomY + Math.max(1, headerRowHeight - headerFontSize - 2);
+
     page.drawText("ORD", {
         x: tableX + 4,
-        y: headerBottomY + ((headerRowHeight - headerFontSize) / 2),
+        y: headerTextY,
         size: headerFontSize,
         font,
         color: rgb(0, 0, 0)
     });
     page.drawText("QTY", {
         x: tableX + ordColWidth + 4,
-        y: headerBottomY + ((headerRowHeight - headerFontSize) / 2),
+        y: headerTextY,
         size: headerFontSize,
         font,
         color: rgb(0, 0, 0)
     });
     page.drawText(columnLabel, {
         x: tableX + ordColWidth + qtyColWidth + 4,
-        y: headerBottomY + ((headerRowHeight - headerFontSize) / 2),
+        y: headerTextY,
         size: headerFontSize,
         font,
         color: rgb(0, 0, 0)
@@ -184,17 +189,17 @@ function appendFlipkartSummaryPages(
 ): void {
     if (entries.length === 0) return;
 
-    const tableX = 16;
-    const tableWidth = pageWidth - 32;
-    const marginBottom = 18;
+    const tableX = 8;
+    const tableWidth = pageWidth - 16;
+    const marginBottom = 8;
     const rowFontSize = Math.max(4.75, pageWidth * 0.0095);
-    const rowLineHeight = rowFontSize * 1.2;
-    const rowPaddingY = Math.max(2, rowFontSize * 0.24);
+    const rowLineHeight = rowFontSize * 1.15;
+    const rowPaddingY = 1.2;
     const ordColWidth = Math.min(48, tableWidth * 0.12);
     const qtyColWidth = Math.min(48, tableWidth * 0.12);
     const skuColWidth = Math.max(120, tableWidth - ordColWidth - qtyColWidth);
     const skuTextWidth = Math.max(24, skuColWidth - 8);
-    const footerHeight = Math.max(20, rowFontSize * 2);
+    const footerHeight = 10;
     const borderWidth = 0.8;
 
     let page = targetPdf.addPage([pageWidth, pageHeight]);
@@ -288,7 +293,7 @@ function appendFlipkartSummaryPages(
         borderWidth
     });
 
-    const totalText = `Total package: ${formatFlipkartQty(grandTotal)}`;
+    const totalText = `Total Order : ${formatFlipkartQty(grandTotal)}`;
     page.drawText(totalText, {
         x: tableX + 4,
         y: footerBottomY + ((footerHeight - rowFontSize) / 2),
@@ -326,7 +331,6 @@ export async function processFlipkart(
         }
     }
 
-    const processTimeStamp = formatProcessTimestamp(new Date());
     const labelsToInclude: { page: PDFPage, totalQty: number }[] = [];
     const { height: _commonPageHeight } = copiedPages.length > 0 ? copiedPages[0].getSize() : { height: 0 };
 
@@ -434,17 +438,17 @@ export async function processFlipkart(
             }
         }
 
-        if (options.includeDateTimeOnLabel && options.helveticaFont) {
-            const { x: cropX, y: cropY } = page.getCropBox();
-            const dateTimeText = `- Flipkart Lable Processed At - ${processTimeStamp}`;
-            page.drawText(dateTimeText, {
-                x: cropX + 10,
-                y: cropY + 10,
-                size: 8,
-                font: options.helveticaFont,
-                color: rgb(0, 0, 0)
-            });
-        }
+        // if (options.includeDateTimeOnLabel && options.helveticaFont) {
+        //     const { x: cropX, y: cropY } = page.getCropBox();
+        //     const dateTimeText = `- Flipkart Lable Processed At - ${processTimeStamp}`;
+        //     page.drawText(dateTimeText, {
+        //         x: cropX + 10,
+        //         y: cropY + 10,
+        //         size: 8,
+        //         font: options.helveticaFont,
+        //         color: rgb(0, 0, 0)
+        //     });
+        // }
 
         labelsToInclude.push({ page, totalQty: totalOrderQty });
     }
@@ -466,7 +470,8 @@ export async function processFlipkart(
         if (orderCount >= threshold) {
             const firstPage = copiedPages[0];
             const { width: pageWidth, height: pageHeight } = firstPage.getSize();
-        const summaryEntries = [...flipkartSummaryMap.entries()]
+
+            const summaryEntries = [...flipkartSummaryMap.entries()]
             .map(([sku, summary]) => ({
                 sku,
                 orderCount: summary.orderCount,
@@ -482,6 +487,7 @@ export async function processFlipkart(
     if (options.includeMultiQtySummary && options.helveticaFont && multiQtyFlipkartSummaryMap.size > 0) {
         const firstPage = copiedPages[0];
         const { width: pageWidth, height: pageHeight } = firstPage.getSize();
+
         const summaryEntries = [...multiQtyFlipkartSummaryMap.entries()]
             .map(([sku, summary]) => ({
                 sku,
