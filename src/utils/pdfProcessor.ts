@@ -154,6 +154,7 @@ export async function cropLabels(
     includePageNumbers: boolean = false,
     includeDateTimeOnLabel: boolean = false,
     summaryThreshold: number = 0,
+    summaryOrientation: 'portrait' | 'landscape' = 'portrait',
     showMultiQtyOnBottom: boolean = false,
     includeMultiQtySummary: boolean = false,
     orderMeeshoByDeliveryPartner: boolean = false
@@ -192,6 +193,7 @@ export async function cropLabels(
         includeFlipkartOrderSummary,
         includeDateTimeOnLabel,
         summaryThreshold,
+        summaryOrientation,
         showMultiQtyOnBottom,
         includeMultiQtySummary,
         orderMeeshoByDeliveryPartner,

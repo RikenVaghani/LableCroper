@@ -68,6 +68,8 @@ export type AmazonSummaryEntry = {
 
 export type MeeshoSummaryEntry = {
     sku: string;
+    orderCount: number;
+    qtyPerSku: string;
     totalQty: number;
 };
 
@@ -89,6 +91,7 @@ export type ProcessorOptions = {
     includeFlipkartOrderSummary?: boolean;
     includeDateTimeOnLabel?: boolean;
     summaryThreshold?: number;
+    summaryOrientation?: 'portrait' | 'landscape';
     showMultiQtyOnBottom?: boolean;
     includeMultiQtySummary?: boolean;
     orderMeeshoByDeliveryPartner?: boolean;

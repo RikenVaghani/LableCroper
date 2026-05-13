@@ -1,4 +1,4 @@
-import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
 import type {
     MeeshoSummaryEntry,
     ProcessorOptions,
@@ -16,38 +16,111 @@ function drawMeeshoSummaryHeader(
     page: PDFPage,
     font: PDFFont,
     pageWidth: number,
-    y: number,
-    isContinuation: boolean
+    pageHeight: number,
+    isContinuation: boolean,
+    numCols: number = 1
 ): number {
-    const titleSize = Math.max(8, pageWidth * 0.02);
-    const subTitleSize = Math.max(6.5, pageWidth * 0.015);
+    const tableX = 8;
+    const tableWidth = pageWidth - 16;
+    const tableTopY = pageHeight - 2;
+    const headlineRowHeight = 22;
+    const headerRowHeight = 20;
 
-    page.drawText(isContinuation ? "Meesho Order Summary (continued)" : "Meesho Order Summary", {
-        x: 16,
-        y,
-        size: titleSize,
+    const colSpacing = 8;
+    const colWidth = (tableWidth - (numCols - 1) * colSpacing) / numCols;
+
+    const ordColWidth = Math.min(48, colWidth * 0.12);
+    const qtyColWidth = Math.min(48, colWidth * 0.12);
+    const skuColWidth = Math.max(80, colWidth - ordColWidth - qtyColWidth);
+
+    const headlineFontSize = Math.max(8.5, pageWidth * 0.021);
+    const headerFontSize = Math.max(9.5, pageWidth * 0.019);
+
+    const todayText = new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    }).format(new Date());
+    const headlineText = isContinuation
+        ? `Meesho order summary (continued) on ${todayText}`
+        : `This Meesho label is cropped by LabelCropper on ${todayText}`;
+
+    const headlineBottomY = tableTopY - headlineRowHeight;
+    const headerBottomY = headlineBottomY - headerRowHeight;
+
+    // Draw Headline Box (Full Width)
+    page.drawRectangle({
+        x: tableX,
+        y: headlineBottomY,
+        width: tableWidth,
+        height: headlineRowHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.8
+    });
+
+    page.drawText(headlineText, {
+        x: tableX + 4,
+        y: headlineBottomY + ((headlineRowHeight - headlineFontSize) / 2),
+        size: headlineFontSize,
         font,
         color: rgb(0, 0, 0)
     });
 
-    const columnY = y - (titleSize + 8);
-    page.drawText("SKU", {
-        x: 16,
-        y: columnY,
-        size: subTitleSize,
-        font,
-        color: rgb(0, 0, 0)
-    });
-    page.drawText("Total Qty", {
-        x: pageWidth - 96,
-        y: columnY,
-        size: subTitleSize,
-        font,
-        color: rgb(0, 0, 0)
-    });
+    // Draw Header Boxes for each column
+    for (let c = 0; c < numCols; c++) {
+        const colX = tableX + (c * (colWidth + colSpacing));
 
-    const dataStartGap = Math.max(14, subTitleSize * 2.2);
-    return columnY - dataStartGap;
+        page.drawRectangle({
+            x: colX,
+            y: headerBottomY,
+            width: ordColWidth,
+            height: headerRowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.8
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth,
+            y: headerBottomY,
+            width: qtyColWidth,
+            height: headerRowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.8
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth + qtyColWidth,
+            y: headerBottomY,
+            width: skuColWidth,
+            height: headerRowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.8
+        });
+
+        const headerTextY = headerBottomY + ((headerRowHeight - headerFontSize) / 2);
+
+        page.drawText("ORD", {
+            x: colX + 4,
+            y: headerTextY,
+            size: headerFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+        page.drawText("QTY", {
+            x: colX + ordColWidth + 4,
+            y: headerTextY,
+            size: headerFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+        page.drawText("SKU ID", {
+            x: colX + ordColWidth + qtyColWidth + 4,
+            y: headerTextY,
+            size: headerFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+    }
+
+    return headerBottomY;
 }
 
 function appendMeeshoSummaryPages(
@@ -59,61 +132,155 @@ function appendMeeshoSummaryPages(
 ): void {
     if (entries.length === 0) return;
 
-    const marginX = 16;
-    const marginBottom = 14;
-    const rowFontSize = Math.max(5.5, pageWidth * 0.012);
-    const rowLineHeight = rowFontSize * 1.25;
-    const rowSpacing = Math.max(2, rowFontSize * 0.22);
-    const qtyColumnWidth = 80;
-    const skuColumnWidth = Math.max(40, pageWidth - (marginX * 2) - qtyColumnWidth - 14);
+    const tableX = 8;
+    const tableWidth = pageWidth - 16;
+    const marginBottom = 8;
+    const colSpacing = 8;
+
+    const rowFontSize = Math.max(9.5, pageWidth * 0.019);
+    const rowLineHeight = rowFontSize * 1.15;
+    const rowPaddingY = 2.4;
+    const footerHeight = 20;
+    const borderWidth = 0.8;
+
+    const availableHeight = (pageHeight - 2 - 22 - 20) - marginBottom - footerHeight;
+    const colWidth1 = tableWidth;
+    const ordColWidth1 = Math.min(48, colWidth1 * 0.12);
+    const qtyColWidth1 = Math.min(48, colWidth1 * 0.12);
+    const skuColWidth1 = Math.max(80, colWidth1 - ordColWidth1 - qtyColWidth1);
+    const skuTextWidth1 = Math.max(24, skuColWidth1 - 8);
+
+    let totalHeight1Col = 0;
+    for (const entry of entries) {
+        const skuLines = wrapTextToWidth(entry.sku, font, rowFontSize, skuTextWidth1);
+        const safeLines = skuLines.length > 0 ? skuLines : ['-'];
+        totalHeight1Col += (safeLines.length * rowLineHeight) + (rowPaddingY * 2);
+    }
+
+    const numCols = totalHeight1Col > availableHeight ? 2 : 1;
+
+    const colWidth = (tableWidth - (numCols - 1) * colSpacing) / numCols;
+
+    const ordColWidth = Math.min(48, colWidth * 0.12);
+    const qtyColWidth = Math.min(48, colWidth * 0.12);
+    const skuColWidth = Math.max(80, colWidth - ordColWidth - qtyColWidth);
+    const skuTextWidth = Math.max(24, skuColWidth - 8);
 
     let page = targetPdf.addPage([pageWidth, pageHeight]);
-    let cursorY = drawMeeshoSummaryHeader(page, font, pageWidth, pageHeight - 16, false);
+    let startY = drawMeeshoSummaryHeader(page, font, pageWidth, pageHeight, false, numCols);
+    let cursorY = startY;
+    let currentCol = 0;
 
     for (const entry of entries) {
-        const skuLines = wrapTextToWidth(entry.sku, font, rowFontSize, skuColumnWidth);
+        const skuLines = wrapTextToWidth(entry.sku, font, rowFontSize, skuTextWidth);
         const safeLines = skuLines.length > 0 ? skuLines : ['-'];
-        const rowHeight = (safeLines.length * rowLineHeight) + rowSpacing;
+        const rowHeight = (safeLines.length * rowLineHeight) + (rowPaddingY * 2);
 
-        if (cursorY - rowHeight < marginBottom) {
-            page = targetPdf.addPage([pageWidth, pageHeight]);
-            cursorY = drawMeeshoSummaryHeader(page, font, pageWidth, pageHeight - 16, true);
+        if (cursorY - rowHeight < marginBottom + footerHeight) {
+            if (currentCol < numCols - 1) {
+                currentCol++;
+                cursorY = startY;
+            } else {
+                page = targetPdf.addPage([pageWidth, pageHeight]);
+                startY = drawMeeshoSummaryHeader(page, font, pageWidth, pageHeight, true, numCols);
+                cursorY = startY;
+                currentCol = 0;
+            }
         }
 
+        const colX = tableX + (currentCol * (colWidth + colSpacing));
+        const rowBottomY = cursorY - rowHeight;
+
+        // Draw Row Boxes
+        page.drawRectangle({
+            x: colX,
+            y: rowBottomY,
+            width: ordColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth,
+            y: rowBottomY,
+            width: qtyColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth + qtyColWidth,
+            y: rowBottomY,
+            width: skuColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+
+        const ordText = String(entry.orderCount);
+        const qtyText = entry.qtyPerSku;
+        const ordTextWidth = font.widthOfTextAtSize(ordText, rowFontSize);
+        const qtyTextWidth = font.widthOfTextAtSize(qtyText, rowFontSize);
+        const ordTextY = rowBottomY + ((rowHeight - rowFontSize) / 2);
+        const qtyTextY = ordTextY;
+
+        page.drawText(ordText, {
+            x: colX + Math.max(4, (ordColWidth - ordTextWidth) / 2),
+            y: ordTextY,
+            size: rowFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+        page.drawText(qtyText, {
+            x: colX + ordColWidth + Math.max(4, (qtyColWidth - qtyTextWidth) / 2),
+            y: qtyTextY,
+            size: rowFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+
+        const skuStartY = rowBottomY + rowHeight - rowPaddingY - rowFontSize;
         safeLines.forEach((line, index) => {
             page.drawText(line, {
-                x: marginX,
-                y: cursorY - (index * rowLineHeight),
+                x: colX + ordColWidth + qtyColWidth + 4,
+                y: skuStartY - (index * rowLineHeight),
                 size: rowFontSize,
                 font,
                 color: rgb(0, 0, 0)
             });
         });
 
-        const qtyText = String(entry.totalQty);
-        const qtyTextWidth = font.widthOfTextAtSize(qtyText, rowFontSize);
-        page.drawText(qtyText, {
-            x: pageWidth - marginX - qtyTextWidth,
-            y: cursorY,
-            size: rowFontSize,
-            font,
-            color: rgb(0, 0, 0)
-        });
-
-        cursorY -= rowHeight;
+        cursorY = rowBottomY;
     }
 
-    const grandTotal = entries.reduce((sum, entry) => sum + entry.totalQty, 0);
-    if (cursorY - (rowLineHeight * 2) < marginBottom) {
-        page = targetPdf.addPage([pageWidth, pageHeight]);
-        cursorY = drawMeeshoSummaryHeader(page, font, pageWidth, pageHeight - 16, true);
+    const totalOrders = entries.reduce((sum, entry) => sum + entry.orderCount, 0);
+    if (cursorY - footerHeight < marginBottom) {
+        if (currentCol < numCols - 1) {
+            currentCol++;
+            cursorY = startY;
+        } else {
+            page = targetPdf.addPage([pageWidth, pageHeight]);
+            cursorY = drawMeeshoSummaryHeader(page, font, pageWidth, pageHeight, true, numCols);
+            currentCol = 0;
+        }
     }
 
-    const totalTextSize = Math.max(rowFontSize, pageWidth * 0.015);
-    page.drawText(`Grand Total Qty: ${grandTotal}`, {
-        x: marginX,
-        y: cursorY - rowLineHeight,
-        size: totalTextSize,
+    const finalFooterX = tableX + (currentCol * (colWidth + colSpacing));
+    const footerBottomY = cursorY - footerHeight;
+
+    page.drawRectangle({
+        x: finalFooterX,
+        y: footerBottomY,
+        width: colWidth,
+        height: footerHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth
+    });
+
+    page.drawText(`Total Ord Qty : ${totalOrders}`, {
+        x: finalFooterX + 4,
+        y: footerBottomY + ((footerHeight - rowFontSize) / 2),
+        size: rowFontSize,
         font,
         color: rgb(0, 0, 0)
     });
@@ -126,9 +293,7 @@ export async function processMeesho(
     options: ProcessorOptions
 ): Promise<void> {
     const copiedPages = await targetPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
-    const meeshoSummaryMap = new Map<string, number>();
-    const multiQtyMeeshoSummaryMap = new Map<string, number>();
-    const boldFont = options.helveticaFont ? await targetPdf.embedFont(StandardFonts.HelveticaBold) : null;
+    const meeshoSummaryMap = new Map<string, { orderCount: number; totalQty: number; qty: number; sku: string }>();
     const processTimeStamp = formatProcessTimestamp(new Date());
 
     let defaultTlx = config.tlx;
@@ -228,7 +393,7 @@ export async function processMeesho(
                 !!options.includeMeeshoOrderSummary ||
                 !!options.includeDateTimeOnLabel ||
                 !!options.includeMultiQtySummary ||
-                !!options.showMultiQtyOnBottom
+                !!options.orderMeeshoByDeliveryPartner
             );
 
         if (shouldReadMeeshoTextLayer) {
@@ -302,41 +467,14 @@ export async function processMeesho(
                             }
 
                             if (options.includeMeeshoOrderSummary) {
-                                meeshoSummaryMap.set(skuText, (meeshoSummaryMap.get(skuText) ?? 0) + qty);
+                                const key = `${skuText}::${qty}`;
+                                const existing = meeshoSummaryMap.get(key) ?? { orderCount: 0, totalQty: 0, qty: qty, sku: skuText };
+                                existing.orderCount += 1;
+                                existing.totalQty += qty;
+                                meeshoSummaryMap.set(key, existing);
                             }
 
-                            if (options.includeMultiQtySummary && qty > 1) {
-                                multiQtyMeeshoSummaryMap.set(skuText, (multiQtyMeeshoSummaryMap.get(skuText) ?? 0) + qty);
-                            }
 
-                            if (options.showMultiQtyOnBottom && qty > 1 && options.helveticaFont) {
-                                const { x: cropX, y: cropY, width: cropWidth } = page.getCropBox();
-                                const text = `Qty : ${qty}`;
-                                const fontSize = 16;
-                                const font = boldFont || options.helveticaFont;
-                                const textWidth = font.widthOfTextAtSize(text, fontSize);
-
-                                const rectWidth = textWidth + 20;
-                                const rectHeight = fontSize + 10;
-                                const rectX = cropX + cropWidth - rectWidth - 5;
-                                const rectY = cropY + 5;
-
-                                page.drawRectangle({
-                                    x: rectX,
-                                    y: rectY,
-                                    width: rectWidth,
-                                    height: rectHeight,
-                                    color: rgb(0, 0, 0)
-                                });
-
-                                page.drawText(text, {
-                                    x: rectX + 10,
-                                    y: rectY + 5,
-                                    size: fontSize,
-                                    font: font,
-                                    color: rgb(1, 1, 1)
-                                });
-                            }
                         }
                     }
                 }
@@ -350,11 +488,11 @@ export async function processMeesho(
 
     if (options.orderMeeshoByDeliveryPartner || options.includeMultiQtySummary) {
         labelsToInclude.sort((a, b) => {
-            if (options.orderMeeshoByDeliveryPartner && a.deliveryPartnerRank !== b.deliveryPartnerRank) {
-                return a.deliveryPartnerRank - b.deliveryPartnerRank;
-            }
             if (options.includeMultiQtySummary && a.totalQty !== b.totalQty) {
                 return a.totalQty - b.totalQty;
+            }
+            if (options.orderMeeshoByDeliveryPartner && a.deliveryPartnerRank !== b.deliveryPartnerRank) {
+                return a.deliveryPartnerRank - b.deliveryPartnerRank;
             }
             return 0;
         });
@@ -372,21 +510,21 @@ export async function processMeesho(
         if (orderCount >= threshold) {
             const firstPage = copiedPages[0];
             const { width: pageWidth, height: pageHeight } = firstPage.getSize();
-            const summaryEntries = [...meeshoSummaryMap.entries()]
-                .map(([sku, totalQty]) => ({ sku, totalQty }))
-                .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true }));
+
+            const summaryEntries = [...meeshoSummaryMap.values()]
+                .map((summary) => ({
+                    sku: summary.sku,
+                    orderCount: summary.orderCount,
+                    qtyPerSku: String(summary.qty),
+                    totalQty: summary.totalQty
+                }))
+                .sort((a, b) => {
+                    const skuCompare = a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true });
+                    if (skuCompare !== 0) return skuCompare;
+                    return Number(a.qtyPerSku) - Number(b.qtyPerSku);
+                });
 
             appendMeeshoSummaryPages(targetPdf, summaryEntries, options.helveticaFont, pageWidth, pageHeight);
         }
-    }
-
-    if (options.includeMultiQtySummary && options.helveticaFont && multiQtyMeeshoSummaryMap.size > 0) {
-        const firstPage = copiedPages[0];
-        const { width: pageWidth, height: pageHeight } = firstPage.getSize();
-        const summaryEntries = [...multiQtyMeeshoSummaryMap.entries()]
-            .map(([sku, totalQty]) => ({ sku, totalQty }))
-            .sort((a, b) => a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true }));
-
-        appendMeeshoSummaryPages(targetPdf, summaryEntries, options.helveticaFont, pageWidth, pageHeight);
     }
 }

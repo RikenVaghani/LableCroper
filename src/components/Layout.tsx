@@ -116,10 +116,10 @@ export function Layout({ children }: LayoutProps) {
 
       <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
         <div className="mx-auto max-w-7xl px-6 py-12">
-          <div className="grid grid-cols-1 gap-12 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-12 md:grid-cols-3">
 
             {/* Brand Section */}
-            <div className="md:col-span-2">
+            <div>
               <a href="https://codespire.in/" target="_blank" rel="noopener noreferrer" className="group">
                 <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   CodeSpire Technology
@@ -131,42 +131,38 @@ export function Layout({ children }: LayoutProps) {
               </p>
             </div>
 
-            {/* Credits Section */}
-            {/* <div>
-              <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                Developed By
-              </h4>
-              <ul className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                <li className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-default">R V.</li>
-                <li className="hover:text-slate-900 dark:hover:text-white transition-colors cursor-default">S N.</li>
-                <li className="pt-2">
-                  <span className="text-xs italic text-slate-400 dark:text-slate-500">
-                    Special thanks: <span className="text-slate-500 dark:text-slate-300">Pratham Dhanani</span>
-                  </span>
-                </li>
-              </ul>
-            </div> */}
+            {/* Logo Section */}
+            <div className="flex items-center md:justify-center">
+              <div className="h-24 w-24 sm:h-32 sm:w-32 rounded-2xl shadow-md overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800">
+                <img src="/logo.jpg" alt="Logo" className="h-full w-full object-contain" />
+              </div>
+            </div>
 
-            {/* Contact/Action Section (Added for "Good Look") */}
+            {/* Contact/Action Section */}
             <div>
               <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                Connect
+                Connect Us
               </h4>
-              <div className="mt-2">
-                <a href="mailto:rikenvaghani@gmail.com" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                  Contact Us &rarr;
-                </a>
-                <br />
-                <br />
-                <p> Any Suggation and feedback send Please <a href="mailto:rikenvaghani@gmail.com" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Need a new feature, a specific tool, or have a suggestion? We'd love to hear from you!
+                </p>
+                <a href="mailto:rikenvaghani@gmail.com?subject=Suggestion%20or%20Feature%20Request%20for%20EasyMyTools&body=Hi%20CodeSpire%20Team%2C%0D%0A%0D%0AI%20would%20like%20to%20suggest%20the%20following%20feature%20or%20tool%3A%0D%0A%0D%0A-%20%5BDescribe%20your%20idea%20here%5D%0D%0A%0D%0AThank%20you!" className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
                   Get in touch &rarr;
-                </a> </p>
+                </a>
               </div>
             </div>
           </div>
 
+          {/* Thank You Message */}
+          <div className="mt-12 text-center">
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              ❤️ Thank you for using <span className="font-semibold text-slate-900 dark:text-slate-100">EasyMyTools</span>! We appreciate your support.
+            </p>
+          </div>
+
           {/* Bottom Bar */}
-          <div className="mt-12 border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               &copy; {new Date().getFullYear()} CodeSpire Technology. All rights reserved.   & Developed by <a href="https://codespire.in/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 dark:hover:text-white transition-colors">CodeSpire Technology</a>
             </p>

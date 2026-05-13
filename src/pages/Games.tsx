@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Grid3X3, FastForward, Layers, Rocket, Activity } from 'lucide-react'
+import { ArrowLeft, Grid3X3, FastForward, Layers, Rocket, Activity, Cuboid } from 'lucide-react'
 import { TicTacToe } from '../components/games/TicTacToe'
 import { Snake } from '../components/games/Snake'
 import { BlockBreaker } from '../components/games/BlockBreaker'
@@ -8,8 +8,9 @@ import { Blastar } from '../components/games/Blastar'
 import { DinoRun } from '../components/games/DinoRun'
 import { Game2048 } from '../components/games/Game2048'
 import { Sudoku } from '../components/games/Sudoku'
+import { TheCube } from '../components/games/TheCube'
 
-type GameType = 'tictactoe' | 'snake' | 'blockbreaker' | 'blastar' | 'dinorun' | '2048' | 'sudoku' | null
+type GameType = 'tictactoe' | 'snake' | 'blockbreaker' | 'blastar' | 'dinorun' | '2048' | 'sudoku' | 'thecube' | null
 
 export function Games() {
   const [selectedGame, setSelectedGame] = useState<GameType>(null)
@@ -29,6 +30,14 @@ export function Games() {
       description: 'Slide tiles and reach the 2048 block',
       color: 'from-amber-500 to-orange-500',
       component: <Game2048 />
+    },
+    {
+      id: 'thecube' as const,
+      title: 'The Cube',
+      icon: <Cuboid className="h-6 w-6" />,
+      description: '3D Rubik-style cube puzzle challenge',
+      color: 'from-cyan-500 to-blue-600',
+      component: <TheCube />
     },
     {
       id: 'sudoku' as const,

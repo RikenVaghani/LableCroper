@@ -6,10 +6,21 @@ const CANV_HEIGHT = 400
 const GROUND_Y = CANV_HEIGHT - 50
 const DINO_WIDTH = 44
 const DINO_HEIGHT = 48
-const GRAVITY = 0.6
-const JUMP_FORCE = -12
 const INITIAL_SPEED = 6
 const SPEED_INC = 0.001
+type Difficulty = 'Easy' | 'Medium' | 'Hard'
+
+const DIFFICULTY_CONFIG: Record<Difficulty, {
+  speedMult: number
+  spawnMult: number
+  gravity: number
+  jump: number
+  scoreStep: number
+}> = {
+  Easy: { speedMult: 0.85, spawnMult: 0.9, gravity: 0.52, jump: -11.5, scoreStep: 1 },
+  Medium: { speedMult: 1, spawnMult: 1, gravity: 0.6, jump: -12, scoreStep: 1 },
+  Hard: { speedMult: 1.2, spawnMult: 1.25, gravity: 0.72, jump: -12.6, scoreStep: 2 }
+}
 
 interface Obstacle {
   x: number
@@ -30,6 +41,7 @@ export function DinoRun() {
   const [highScore, setHighScore] = useState(0)
   const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'GAMEOVER'>('IDLE')
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [difficulty, setDifficulty] = useState<Difficulty>('Medium')
 
   // Game state refs
   const dinoPos = useRef({ y: GROUND_Y - DINO_HEIGHT, velocity: 0, isJumping: false })
@@ -74,15 +86,16 @@ export function DinoRun() {
 
   const jump = useCallback(() => {
     if (!dinoPos.current.isJumping && gameState === 'PLAYING') {
-      dinoPos.current.velocity = JUMP_FORCE
+      dinoPos.current.velocity = DIFFICULTY_CONFIG[difficulty].jump
       dinoPos.current.isJumping = true
     }
-  }, [gameState])
+  }, [gameState, difficulty])
 
   const spawnObstacle = () => {
-    const type = 'cactus'
-    const height = 30 + Math.random() * 30
-    const width = 20 + Math.random() * 20
+    const canSpawnBird = score > 250 && Math.random() > 0.65
+    const type: Obstacle['type'] = canSpawnBird ? 'bird' : 'cactus'
+    const height = type === 'bird' ? 24 : 30 + Math.random() * 30
+    const width = type === 'bird' ? 34 : 20 + Math.random() * 20
     obstacles.current.push({
       x: CANV_WIDTH,
       width,
@@ -125,7 +138,7 @@ export function DinoRun() {
 
     if (gameState === 'PLAYING') {
       // Update Dino
-      dinoPos.current.velocity += GRAVITY
+      dinoPos.current.velocity += DIFFICULTY_CONFIG[difficulty].gravity
       dinoPos.current.y += dinoPos.current.velocity
 
       if (dinoPos.current.y > GROUND_Y - DINO_HEIGHT) {
@@ -135,11 +148,11 @@ export function DinoRun() {
       }
 
       // Update Speed and Score
-      gameSpeed.current += SPEED_INC
-      setScore(s => s + 1)
+      gameSpeed.current += SPEED_INC * DIFFICULTY_CONFIG[difficulty].speedMult
+      setScore(s => s + DIFFICULTY_CONFIG[difficulty].scoreStep)
 
       // Spawn Obstacles
-      if (frameCount.current % Math.floor(100 / (gameSpeed.current / 5)) === 0) {
+      if (frameCount.current % Math.max(28, Math.floor((100 / (gameSpeed.current / 5)) / DIFFICULTY_CONFIG[difficulty].spawnMult)) === 0) {
         if (Math.random() > 0.7) spawnObstacle()
       }
 
@@ -148,15 +161,18 @@ export function DinoRun() {
         obs.x -= gameSpeed.current
         
         // Draw Obstacle (Cactus)
-        ctx.fillStyle = isDarkMode ? '#10b981' : '#059669'
+        ctx.fillStyle = obs.type === 'bird'
+          ? (isDarkMode ? '#f59e0b' : '#b45309')
+          : (isDarkMode ? '#10b981' : '#059669')
         ctx.beginPath()
-        ctx.roundRect(obs.x, GROUND_Y - obs.height, obs.width, obs.height, 4)
+        const obsTop = obs.type === 'bird' ? GROUND_Y - obs.height - 65 : GROUND_Y - obs.height
+        ctx.roundRect(obs.x, obsTop, obs.width, obs.height, 4)
         ctx.fill()
 
         // Collision Check
         const dinoPadding = 10
         if (
-          dinoPos.current.y + DINO_HEIGHT > GROUND_Y - obs.height &&
+          dinoPos.current.y + DINO_HEIGHT > (obs.type === 'bird' ? GROUND_Y - obs.height - 65 : GROUND_Y - obs.height) &&
           dinoPos.current.y < GROUND_Y &&
           obs.x < (50 + DINO_WIDTH - dinoPadding) &&
           obs.x + obs.width > (50 + dinoPadding)
@@ -188,7 +204,7 @@ export function DinoRun() {
     ctx.fillRect(dx + 25, dy + DINO_HEIGHT - 10, 10, 10)
 
     requestRef.current = requestAnimationFrame(draw)
-  }, [gameState, isDarkMode])
+  }, [gameState, isDarkMode, difficulty, score])
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(draw)
@@ -214,6 +230,7 @@ export function DinoRun() {
   const startGame = () => {
     setScore(0)
     initGame()
+    gameSpeed.current = INITIAL_SPEED * DIFFICULTY_CONFIG[difficulty].speedMult
     setGameState('PLAYING')
   }
 
@@ -235,6 +252,25 @@ export function DinoRun() {
             <Cloud className={`h-5 w-5 ${isDarkMode ? 'text-slate-600' : 'text-sky-400'}`} />
             <span className="text-[10px] uppercase font-bold text-slate-400">{isDarkMode ? 'Night' : 'Day'}</span>
         </div>
+      </div>
+
+      <div className="flex w-full items-center justify-center gap-2">
+        {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((lvl) => (
+          <button
+            key={lvl}
+            onClick={() => {
+              if (gameState === 'PLAYING') return
+              setDifficulty(lvl)
+            }}
+            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
+              difficulty === lvl
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+            }`}
+          >
+            {lvl}
+          </button>
+        ))}
       </div>
 
       <div className="relative group overflow-hidden rounded-2xl border-4 border-slate-200 dark:border-slate-800 shadow-2xl w-full select-none touch-none">
@@ -269,6 +305,9 @@ export function DinoRun() {
                 </button>
                 <p className="text-slate-400 text-xs uppercase tracking-widest leading-relaxed">
                   SPACE / UP / CLICK TO JUMP
+                </p>
+                <p className="text-slate-500 text-[10px] uppercase tracking-widest">
+                  Difficulty: {difficulty}
                 </p>
               </div>
             )}
