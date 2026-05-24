@@ -7,11 +7,9 @@ import {
   LABEL_CONFIGS,
   loadPDF,
   mergePDFs,
-  mergePDFDocuments,
   type AmazonDescriptionMode,
   type FlipkartDescriptionMode
 } from '../utils/pdfProcessor'
-import { PDFDocument } from 'pdf-lib'
 import {
   FileText, 
   Loader2, 
@@ -310,7 +308,7 @@ export function LabelCropper() {
   const [includePageNumbers, setIncludePageNumbers] = useState(
     !!savedSettings?.includePageNumbers
   )
-  const [includeDateTimeOnLabel] = useState(
+  const [includeDateTimeOnLabel, setIncludeDateTimeOnLabel] = useState(
     savedSettings?.includeDateTimeOnLabel ?? true
   )
   const [summaryThreshold, setSummaryThreshold] = useState<number>(
@@ -520,12 +518,15 @@ export function LabelCropper() {
       const results: DownloadItem[] = []
       const config = LABEL_CONFIGS[selectedPlatform]
       const batchTimestamp = buildTimestamp()
-      const processedDocs: PDFDocument[] = []
+      const inputFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
 
-      if (mergeAllFiles && files.length > 1) {
-        const mergedSourcePdf = await mergePDFs(files)
-        const processedMergedPdf = await cropLabels(
-          mergedSourcePdf,
+      if (mergeAllFiles) {
+        const sourcePdf =
+          inputFiles.length > 1
+            ? await mergePDFs(inputFiles)
+            : await loadPDF(inputFiles[0])
+        const processedPdf = await cropLabels(
+          sourcePdf,
           config,
           false,
           selectedVariantId,
@@ -544,22 +545,13 @@ export function LabelCropper() {
           orderMeeshoByDeliveryPartner,
           treatValmoPlusAsValmo
         )
-
-        const bytes = await processedMergedPdf.save({ useObjectStreams: false })
+        const bytes = await processedPdf.save({ useObjectStreams: false })
         results.push({
           name: getDownloadName(`${config.label}_Merged`, 'pdf', undefined, batchTimestamp),
           blob: new Blob([bytes as BlobPart], { type: 'application/pdf' })
         })
-
-        for (const item of results) {
-          downloadFile(item)
-        }
-        setGeneratedFiles(results)
-        setFiles([])
-        return
-      }
-
-      for (const file of files) {
+      } else {
+        for (const file of inputFiles) {
         const sourcePdf = await loadPDF(file)
         const croppedPdf = await cropLabels(
           sourcePdf,
@@ -581,27 +573,12 @@ export function LabelCropper() {
           orderMeeshoByDeliveryPartner,
           treatValmoPlusAsValmo
         )
-        processedDocs.push(croppedPdf)
-
-        if (!mergeAllFiles) {
           const bytes = await croppedPdf.save({ useObjectStreams: false })
           results.push({
             name: getDownloadName(config.label, 'pdf', file.name, batchTimestamp),
             blob: new Blob([bytes as BlobPart], { type: 'application/pdf' })
           })
         }
-      }
-
-      if (mergeAllFiles && processedDocs.length > 0) {
-        const mergedPdf = processedDocs.length > 1 
-          ? await mergePDFDocuments(processedDocs)
-          : processedDocs[0]
-        
-        const bytes = await mergedPdf.save({ useObjectStreams: false })
-        results.push({
-          name: getDownloadName(`${config.label}_Merged`, 'pdf', undefined, batchTimestamp),
-          blob: new Blob([bytes as BlobPart], { type: 'application/pdf' })
-        })
       }
 
       for (const item of results) {
@@ -850,6 +827,7 @@ export function LabelCropper() {
                 onThresholdChange={setSummaryThreshold}
               />
               <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
+              <ToggleOption label="Add Process Time" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
             </div>
           </section>
@@ -900,6 +878,7 @@ export function LabelCropper() {
               
 
               <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
+              <ToggleOption label="Add Process Time" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
               <ToggleOption label="Order by Delivery Partner" checked={orderMeeshoByDeliveryPartner} onChange={setOrderMeeshoByDeliveryPartner} />
               <ToggleOption label="Treat ValmoPlus as Valmo" checked={treatValmoPlusAsValmo} onChange={setTreatValmoPlusAsValmo} />
