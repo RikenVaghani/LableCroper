@@ -451,10 +451,11 @@ export async function processMeesho(
 
     const labelsToInclude: { page: PDFPage, totalQty: number, deliveryPartnerRank: number }[] = [];
     const deliveryPartnerPriority: RegExp[] = [
+        /\bvalmoplus\b/i,
         /\bvalmo express\b/i,
         /\bvalmo\b/i,
         /\bdelhivery\b/i,
-        /\bxpressbees\b/i,
+        /\bxpress\s*bees\b/i,
         /\bshadowfax\b/i
     ];
 
@@ -623,6 +624,10 @@ export async function processMeesho(
                                 const prevWord = dataLine.words[qtyIdx - 1]?.text?.trim();
                                 if (prevWord) colorText = prevWord;
                             }
+                        }
+                        if (colorText === '-') {
+                            const naWord = dataLine.words.find(w => w.upper === 'NA')?.text?.trim();
+                            if (naWord) colorText = naWord;
                         }
 
                         const forbidden = ['SKU', 'SIZE', 'QTY', 'COLOR', 'ORDER NO.', 'FREE SIZE', 'NA'];

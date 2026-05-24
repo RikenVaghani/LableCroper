@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Trash2, StickyNote, Save, Clock, Type } from 'lucide-react'
+import { Plus, Trash2, StickyNote, Save, Clock, Type, Minus, Highlighter, Underline } from 'lucide-react'
 import { cn } from '../utils/cn'
 
 interface Note {
@@ -11,8 +11,10 @@ interface Note {
 }
 
 const STORAGE_KEY = 'easy_my_tools_notes_v1'
+const FONT_SIZE_KEY = 'easy_my_tools_notepad_font_size_v1'
 
 export function Notepad() {
+  const editorRef = useRef<HTMLDivElement | null>(null)
   const [notes, setNotes] = useState<Note[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
@@ -26,12 +28,22 @@ export function Notepad() {
   })
 
   const [activeNoteId, setActiveNoteId] = useState<string>(notes[0]?.id || '1')
+  const [fontSize, setFontSize] = useState<number>(() => {
+    const saved = localStorage.getItem(FONT_SIZE_KEY)
+    const parsed = saved ? Number(saved) : NaN
+    return Number.isFinite(parsed) ? Math.min(40, Math.max(12, parsed)) : 22
+  })
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
   }, [notes])
 
+  useEffect(() => {
+    localStorage.setItem(FONT_SIZE_KEY, String(fontSize))
+  }, [fontSize])
+
   const activeNote = notes.find(n => n.id === activeNoteId) || notes[0]
+  const plainTextContent = (activeNote?.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 
   const updateNote = (content: string) => {
     setNotes(prev => prev.map(n => 
@@ -64,6 +76,43 @@ export function Notepad() {
     if (activeNoteId === id) {
       setActiveNoteId(nextNotes[0].id)
     }
+  }
+
+  useEffect(() => {
+    if (editorRef.current && activeNote) {
+      editorRef.current.innerHTML = activeNote.content || ''
+    }
+  }, [activeNoteId, activeNote?.content])
+
+  const updateActiveNoteFromEditor = () => {
+    if (!editorRef.current) return
+    updateNote(editorRef.current.innerHTML)
+  }
+
+  const applyInlineFormat = (command: 'underline' | 'hiliteColor', value?: string) => {
+    if (!editorRef.current) return
+    editorRef.current.focus()
+    if (command === 'hiliteColor') {
+      document.execCommand('hiliteColor', false, value ?? '#fef08a')
+    } else {
+      document.execCommand(command, false)
+    }
+    updateActiveNoteFromEditor()
+  }
+
+  const saveLocalFile = () => {
+    if (!activeNote) return
+    const baseName = (activeNote.title || 'note').trim().replace(/[\\/:*?"<>|]/g, '_') || 'note'
+    const textContent = (editorRef.current?.innerText ?? '').replace(/\r?\n/g, '\n')
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${baseName}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -155,30 +204,70 @@ export function Notepad() {
                   placeholder="Note Title..."
                 />
               </div>
-              <div className="flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <button
+                  type="button"
+                  onClick={() => setFontSize(prev => Math.max(12, prev - 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Decrease text size"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFontSize(prev => Math.min(40, prev + 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Increase text size"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyInlineFormat('hiliteColor', '#fef08a')}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Highlight selected text"
+                >
+                  <Highlighter className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyInlineFormat('underline')}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Underline selected text"
+                >
+                  <Underline className="h-3.5 w-3.5" />
+                </button>
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" />
                   Saved
                 </span>
-                <span className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={saveLocalFile}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Save file in local device"
+                >
                   <Save className="h-3.5 w-3.5" />
-                  Local
-                </span>
+                  Save Local
+                </button>
               </div>
             </div>
             
-            <textarea
-              value={activeNote.content}
-              onChange={(e) => updateNote(e.target.value)}
-              className="flex-1 p-6 bg-transparent resize-none focus:ring-0 border-none text-slate-700 dark:text-slate-300 leading-relaxed placeholder-slate-400 text-xl"
-              placeholder="Start writing your note here..."
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={updateActiveNoteFromEditor}
+              className="flex-1 p-6 bg-transparent overflow-auto focus:outline-none text-slate-700 dark:text-slate-300 leading-relaxed"
+              style={{ fontSize: `${fontSize}px`, direction: 'ltr', unicodeBidi: 'plaintext', writingMode: 'horizontal-tb', whiteSpace: 'pre-wrap' }}
+              data-placeholder="Start writing your note here..."
               spellCheck={false}
             />
             
             <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex items-center justify-between text-[11px] text-slate-500">
               <div className="flex gap-4">
-                <span>{activeNote.content.length} characters</span>
-                <span>{activeNote.content.split(/\s+/).filter(Boolean).length} words</span>
+                <span>{plainTextContent.length} characters</span>
+                <span>{plainTextContent.split(/\s+/).filter(Boolean).length} words</span>
               </div>
               <p>Everything stays in your browser</p>
             </div>

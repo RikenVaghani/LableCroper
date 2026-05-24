@@ -34,8 +34,23 @@ import {
   Shield,
   SquarePen,
   Trash2,
+  RotateCw,
+  GripVertical,
+  Stamp,
+  Lock,
+  LockOpen,
+  Layers,
+  X,
   type LucideIcon
 } from 'lucide-react'
+
+import { RotatePDF } from '../components/pdf-tools/RotatePDF'
+import { DeletePages } from '../components/pdf-tools/DeletePages'
+import { ReorderPages } from '../components/pdf-tools/ReorderPages'
+import { WatermarkPDF } from '../components/pdf-tools/WatermarkPDF'
+import { ProtectPDF } from '../components/pdf-tools/ProtectPDF'
+import { UnlockPDF } from '../components/pdf-tools/UnlockPDF'
+import { FlattenPDF } from '../components/pdf-tools/FlattenPDF'
 import { cn } from '../utils/cn'
 
 type PdfTool =
@@ -53,6 +68,13 @@ type PdfTool =
   | 'PDF_FORMS'
   | 'PDF_ANNOTATE'
   | 'PDF_NUMBER'
+  | 'PDF_ROTATE'
+  | 'PDF_DELETE_PAGES'
+  | 'PDF_REORDER_PAGES'
+  | 'PDF_WATERMARK'
+  | 'PDF_PROTECT'
+  | 'PDF_UNLOCK'
+  | 'PDF_FLATTEN'
 
 const PDF_TOOLS: PdfTool[] = [
   'PDF_MERGE',
@@ -68,7 +90,14 @@ const PDF_TOOLS: PdfTool[] = [
   'PDF_ESIGN',
   'PDF_FORMS',
   'PDF_ANNOTATE',
-  'PDF_NUMBER'
+  'PDF_NUMBER',
+  'PDF_ROTATE',
+  'PDF_DELETE_PAGES',
+  'PDF_REORDER_PAGES',
+  'PDF_WATERMARK',
+  'PDF_PROTECT',
+  'PDF_UNLOCK',
+  'PDF_FLATTEN'
 ];
 
 type DownloadItem = {
@@ -234,6 +263,62 @@ const PDF_TOOL_CONFIG: Record<
     icon: FileDigit,
     iconClassName: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300',
     implemented: true
+  },
+  PDF_ROTATE: {
+    label: 'Rotate PDF',
+    hoverText: 'Rotate pages in any direction.',
+    uploadTitle: 'Upload PDF',
+    icon: RotateCw,
+    iconClassName: 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300',
+    implemented: true
+  },
+  PDF_DELETE_PAGES: {
+    label: 'Delete Pages',
+    hoverText: 'Remove unwanted pages from your PDF.',
+    uploadTitle: 'Upload PDF',
+    icon: Trash2,
+    iconClassName: 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300',
+    implemented: true
+  },
+  PDF_REORDER_PAGES: {
+    label: 'Reorder Pages',
+    hoverText: 'Drag and drop to rearrange PDF pages.',
+    uploadTitle: 'Upload PDF',
+    icon: GripVertical,
+    iconClassName: 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300',
+    implemented: true
+  },
+  PDF_WATERMARK: {
+    label: 'Watermark PDF',
+    hoverText: 'Add text or image watermark to your PDF.',
+    uploadTitle: 'Upload PDF',
+    icon: Stamp,
+    iconClassName: 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300',
+    implemented: true
+  },
+  PDF_PROTECT: {
+    label: 'Protect PDF',
+    hoverText: 'Password protect your PDF.',
+    uploadTitle: 'Upload PDF',
+    icon: Lock,
+    iconClassName: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300',
+    implemented: false
+  },
+  PDF_UNLOCK: {
+    label: 'Unlock PDF',
+    hoverText: 'Remove password from your PDF.',
+    uploadTitle: 'Upload PDF',
+    icon: LockOpen,
+    iconClassName: 'bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-300',
+    implemented: false
+  },
+  PDF_FLATTEN: {
+    label: 'Flatten PDF',
+    hoverText: 'Merge form fields and annotations into PDF.',
+    uploadTitle: 'Upload PDF',
+    icon: Layers,
+    iconClassName: 'bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-300',
+    implemented: true
   }
 }
 
@@ -297,6 +382,19 @@ export function PDFTools() {
   } | null>(null)
   const [files, setFiles] = useState<File[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const activeToolConfig = pdfTool ? PDF_TOOL_CONFIG[pdfTool] : null
   const isImplementedTool = activeToolConfig?.implemented || false
@@ -308,7 +406,18 @@ export function PDFTools() {
   const uploaderHint = isImagesToPdf
     ? 'Accepted: JPG, PNG, WEBP, BMP, GIF'
     : 'All processing happens locally for your security'
-  const visiblePdfTools = PDF_TOOLS.filter(tool => PDF_TOOL_CONFIG[tool].implemented)
+  
+  const visiblePdfTools = PDF_TOOLS.filter(tool => {
+    const config = PDF_TOOL_CONFIG[tool]
+    if (!config.implemented) return false
+    if (!searchQuery) return true
+    
+    const query = searchQuery.toLowerCase()
+    return (
+      config.label.toLowerCase().includes(query) ||
+      config.hoverText.toLowerCase().includes(query)
+    )
+  })
 
   const activeTitle = isImagesToPdf
     ? (allowMultipleFiles ? 'Drop your image files here' : 'Drop your image file here')
@@ -680,17 +789,21 @@ export function PDFTools() {
           name: getDownloadName('NumberedPdf', 'pdf'),
           blob: createPdfBlob(bytes)
         })
+      } else {
+        throw new Error(`Processing handler is not available for tool: ${pdfTool}`)
       }
 
-      if (results.length > 0) {
-        const shouldZip = pdfTool === 'PDF_SPLIT' || pdfTool === 'PDF_TO_IMAGE'
-        if (shouldZip) {
-          const zipTag = pdfTool === 'PDF_SPLIT' ? 'SplitPdf' : 'PdftoImg'
-          await downloadZip(results, zipTag)
-        } else {
-          for (const item of results) {
-            downloadFile(item)
-          }
+      if (results.length === 0) {
+        throw new Error(`No output generated for tool: ${pdfTool}`)
+      }
+
+      const shouldZip = pdfTool === 'PDF_SPLIT' || pdfTool === 'PDF_TO_IMAGE'
+      if (shouldZip) {
+        const zipTag = pdfTool === 'PDF_SPLIT' ? 'SplitPdf' : 'PdftoImg'
+        await downloadZip(results, zipTag)
+      } else {
+        for (const item of results) {
+          downloadFile(item)
         }
       }
       setFiles([])
@@ -716,77 +829,130 @@ export function PDFTools() {
         {/* <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Quick actions to merge, split, compress, and convert between PDFs and images.</p> */}
       </section>
 
-            <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm  ">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Select Tool</p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {visiblePdfTools.map(tool => {
-            const config = PDF_TOOL_CONFIG[tool]
-            const Icon = config.icon
-
-            return (
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Select Tool</p>
+            <p className="text-xs text-slate-455 dark:text-slate-500 mt-0.5">Choose a quick action to process your files</p>
+          </div>
+          
+          {/* Beautiful Search Input */}
+          <div className="relative w-full md:w-72">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+            </div>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search PDF tools... (Press '/')"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full rounded-xl border border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 pl-10 pr-9 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-sky-500 focus:bg-white dark:focus:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-all duration-200"
+            />
+            {searchQuery ? (
               <button
-                key={tool}
-                onClick={() => handlePdfToolChange(tool)}
-                className={cn(
-                  'group/tool relative cursor-pointer rounded-2xl border p-4 text-left transition',
-                  pdfTool === tool
-                    ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/30 ring-2 ring-sky-100 dark:ring-sky-900/50'
-                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 hover:border-sky-300 hover:shadow-sm'
-                )}
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <span className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', config.iconClassName)}>
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span
-                    className="relative inline-flex shrink-0 cursor-pointer items-center text-slate-400 dark:text-slate-500"
-                    onClick={event => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      setOpenTooltipTool(prev => (prev === tool ? null : tool))
-                    }}
-                  >
-                    <Info className="h-4 w-4" />
-                    <span
-                      className={cn(
-                        'pointer-events-none absolute right-0 top-6 z-20 w-60 rounded-lg border px-3 py-2 text-left text-xs font-medium shadow-xl transition',
-                        pdfTool === tool
-                          ? 'border-sky-300 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300',
-                        openTooltipTool === tool ? 'opacity-100' : 'opacity-0'
-                      )}
-                    >
-                      {config.hoverText}
-                    </span>
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-start justify-between gap-3">
-                  <span className="block min-w-0">
-                    <span className={cn(
-                      'block text-lg font-semibold',
-                      pdfTool === tool
-                        ? 'text-sky-700 dark:text-sky-300'
-                        : 'text-slate-900 dark:text-slate-100'
-                    )}>
-                      {config.label}
-                    </span>
-                    <span className="mt-1 block text-sm text-slate-600 dark:text-slate-400">
-                      {config.hoverText}
-                    </span>
-                  </span>
-                  <ChevronRight className={cn(
-                    'mt-1 h-5 w-5 shrink-0',
-                    pdfTool === tool
-                      ? 'text-sky-600 dark:text-sky-300'
-                      : 'text-slate-400 dark:text-slate-500'
-                  )} />
-                </div>
-
+                <X className="h-4 w-4" />
               </button>
-            )
-          })}
+            ) : (
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded">
+                  /
+                </kbd>
+              </div>
+            )}
+          </div>
         </div>
+
+        {visiblePdfTools.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 transition-all">
+            <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+              <Search className="h-5 w-5 text-slate-400 dark:text-slate-550 animate-pulse" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">No matching PDF tools found</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs text-center">
+              We couldn't find any tools matching "<span className="font-medium text-slate-750 dark:text-slate-300">{searchQuery}</span>". Try another term.
+            </p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="mt-4 rounded-xl bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 active:scale-[0.98] transition shadow-sm"
+            >
+              Clear Search Query
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {visiblePdfTools.map(tool => {
+              const config = PDF_TOOL_CONFIG[tool]
+              const Icon = config.icon
+
+              return (
+                <button
+                  key={tool}
+                  onClick={() => handlePdfToolChange(tool)}
+                  className={cn(
+                    'group/tool relative cursor-pointer rounded-2xl border p-4 text-left transition',
+                    pdfTool === tool
+                      ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/30 ring-2 ring-sky-100 dark:ring-sky-900/50'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 hover:border-sky-300 hover:shadow-sm'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', config.iconClassName)}>
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span
+                      className="relative inline-flex shrink-0 cursor-pointer items-center text-slate-400 dark:text-slate-500"
+                      onClick={event => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setOpenTooltipTool(prev => (prev === tool ? null : tool))
+                      }}
+                    >
+                      <Info className="h-4 w-4" />
+                      <span
+                        className={cn(
+                          'pointer-events-none absolute right-0 top-6 z-20 w-60 rounded-lg border px-3 py-2 text-left text-xs font-medium shadow-xl transition',
+                          pdfTool === tool
+                            ? 'border-sky-300 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300',
+                          openTooltipTool === tool ? 'opacity-100' : 'opacity-0'
+                        )}
+                      >
+                        {config.hoverText}
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-start justify-between gap-3">
+                    <span className="block min-w-0">
+                      <span className={cn(
+                        'block text-lg font-semibold',
+                        pdfTool === tool
+                          ? 'text-sky-700 dark:text-sky-300'
+                          : 'text-slate-900 dark:text-slate-100'
+                      )}>
+                        {config.label}
+                      </span>
+                      <span className="mt-1 block text-sm text-slate-600 dark:text-slate-400">
+                        {config.hoverText}
+                      </span>
+                    </span>
+                    <ChevronRight className={cn(
+                      'mt-1 h-5 w-5 shrink-0',
+                      pdfTool === tool
+                        ? 'text-sky-600 dark:text-sky-300'
+                        : 'text-slate-400 dark:text-slate-500'
+                    )} />
+                  </div>
+
+                </button>
+              )
+            })}
+          </div>
+        )}
       </section>
       {pdfTool && activeToolConfig && (
       <section
@@ -1052,8 +1218,15 @@ export function PDFTools() {
         </section>
       )}
 
-     
+      {pdfTool === 'PDF_ROTATE' && files.length > 0 && <section className="mt-5"><RotatePDF files={files} onDownload={(blob, name) => downloadFile({ name, blob })} /></section>}
+      {pdfTool === 'PDF_DELETE_PAGES' && files.length > 0 && <section className="mt-5"><DeletePages files={files} onDownload={(blob, name) => downloadFile({ name, blob })} /></section>}
+      {pdfTool === 'PDF_REORDER_PAGES' && files.length > 0 && <section className="mt-5"><ReorderPages files={files} onDownload={(blob, name) => downloadFile({ name, blob })} /></section>}
+      {pdfTool === 'PDF_WATERMARK' && files.length > 0 && <section className="mt-5"><WatermarkPDF files={files} onDownload={(blob, name) => downloadFile({ name, blob })} /></section>}
+      {pdfTool === 'PDF_PROTECT' && files.length > 0 && <section className="mt-5"><ProtectPDF files={files} onDownload={(blob, name) => downloadFile({ name, blob })} /></section>}
+      {pdfTool === 'PDF_UNLOCK' && files.length > 0 && <section className="mt-5"><UnlockPDF files={files} onDownload={(blob, name) => downloadFile({ name, blob })} /></section>}
+      {pdfTool === 'PDF_FLATTEN' && files.length > 0 && <section className="mt-5"><FlattenPDF files={files} onDownload={(blob, name) => downloadFile({ name, blob })} /></section>}
 
+      {!['PDF_ROTATE', 'PDF_DELETE_PAGES', 'PDF_REORDER_PAGES', 'PDF_WATERMARK', 'PDF_PROTECT', 'PDF_UNLOCK', 'PDF_FLATTEN'].includes(pdfTool || '') && (
         <div className="mt-5 flex justify-center">
           <button
             onClick={handleProcess}
@@ -1073,6 +1246,7 @@ export function PDFTools() {
             )}
           </button>
         </div>
+      )}
 
         {files.length > 0 && (
           <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
