@@ -52,3 +52,28 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Placeholder support for contenteditable */
+[data-placeholder-visible="true"]::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+}
+
+.dark [data-placeholder-visible="true"]::before {
+  color: #64748b;
+}
+
+/* Ensure formatting works inside contenteditable even with Tailwind resets */
+[contenteditable] b, [contenteditable] strong {
+  font-weight: bold !important;
+}
+[contenteditable] i, [contenteditable] em {
+  font-style: italic !important;
+}
+[contenteditable] u {
+  text-decoration: underline !important;
+}
