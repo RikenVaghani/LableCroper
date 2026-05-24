@@ -311,7 +311,7 @@ export function LabelCropper() {
     !!savedSettings?.includePageNumbers
   )
   const [includeDateTimeOnLabel] = useState(
-    !!savedSettings?.includeDateTimeOnLabel
+    savedSettings?.includeDateTimeOnLabel ?? true
   )
   const [summaryThreshold, setSummaryThreshold] = useState<number>(
     savedSettings?.summaryThreshold ?? 1
@@ -327,6 +327,9 @@ export function LabelCropper() {
   )
   const [orderMeeshoByDeliveryPartner, setOrderMeeshoByDeliveryPartner] = useState(
     !!savedSettings?.orderMeeshoByDeliveryPartner
+  )
+  const [treatValmoPlusAsValmo, setTreatValmoPlusAsValmo] = useState(
+    !!savedSettings?.treatValmoPlusAsValmo
   )
 
   const [files, setFiles] = useState<File[]>([])
@@ -354,6 +357,7 @@ export function LabelCropper() {
       showMultiQtyOnBottom,
       includeMultiQtySummary,
       orderMeeshoByDeliveryPartner,
+      treatValmoPlusAsValmo,
       labelMode
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
@@ -372,6 +376,7 @@ export function LabelCropper() {
     showMultiQtyOnBottom,
     includeMultiQtySummary,
     orderMeeshoByDeliveryPartner,
+    treatValmoPlusAsValmo,
     labelMode
   ])
   
@@ -536,7 +541,8 @@ export function LabelCropper() {
           summaryOrientation,
           showMultiQtyOnBottom,
           includeMultiQtySummary,
-          orderMeeshoByDeliveryPartner
+          orderMeeshoByDeliveryPartner,
+          treatValmoPlusAsValmo
         )
 
         const bytes = await processedMergedPdf.save({ useObjectStreams: false })
@@ -572,7 +578,8 @@ export function LabelCropper() {
           summaryOrientation,
           showMultiQtyOnBottom,
           includeMultiQtySummary,
-          orderMeeshoByDeliveryPartner
+          orderMeeshoByDeliveryPartner,
+          treatValmoPlusAsValmo
         )
         processedDocs.push(croppedPdf)
 
@@ -895,6 +902,7 @@ export function LabelCropper() {
               <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
               <ToggleOption label="Order by Delivery Partner" checked={orderMeeshoByDeliveryPartner} onChange={setOrderMeeshoByDeliveryPartner} />
+              <ToggleOption label="Treat ValmoPlus as Valmo" checked={treatValmoPlusAsValmo} onChange={setTreatValmoPlusAsValmo} />
             </div>
           </section>
         )}

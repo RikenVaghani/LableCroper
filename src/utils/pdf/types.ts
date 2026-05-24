@@ -68,9 +68,16 @@ export type AmazonSummaryEntry = {
 
 export type MeeshoSummaryEntry = {
     sku: string;
+    size: string;
+    color: string;
     orderCount: number;
     qtyPerSku: string;
     totalQty: number;
+};
+
+export type CourierSummaryEntry = {
+    courierPartner: string;
+    packageCount: number;
 };
 
 export type FlipkartSummaryEntry = {
@@ -95,6 +102,7 @@ export type ProcessorOptions = {
     showMultiQtyOnBottom?: boolean;
     includeMultiQtySummary?: boolean;
     orderMeeshoByDeliveryPartner?: boolean;
+    treatValmoPlusAsValmo?: boolean;
     helveticaFont?: PDFFont | null;
     originalDocProxy?: PdfJsDocumentProxy | null;
 };

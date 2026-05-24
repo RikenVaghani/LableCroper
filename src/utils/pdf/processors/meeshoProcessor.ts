@@ -1,6 +1,7 @@
 import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
 import type {
     MeeshoSummaryEntry,
+    CourierSummaryEntry,
     ProcessorOptions,
     CropConfig
 } from '../types';
@@ -31,9 +32,11 @@ function drawMeeshoSummaryHeader(
 
     const ordColWidth = Math.min(48, colWidth * 0.12);
     const qtyColWidth = Math.min(48, colWidth * 0.12);
-    const skuColWidth = Math.max(80, colWidth - ordColWidth - qtyColWidth);
+    const sizeColWidth = Math.min(64, colWidth * 0.14);
+    const colorColWidth = Math.min(72, colWidth * 0.16);
+    const skuColWidth = Math.max(80, colWidth - ordColWidth - qtyColWidth - sizeColWidth - colorColWidth);
 
-    const headlineFontSize = Math.max(8.5, pageWidth * 0.021);
+    let headlineFontSize = Math.max(8.5, pageWidth * 0.021);
     const headerFontSize = Math.max(9.5, pageWidth * 0.019);
 
     const todayText = new Intl.DateTimeFormat('en-GB', {
@@ -57,6 +60,11 @@ function drawMeeshoSummaryHeader(
         borderColor: rgb(0, 0, 0),
         borderWidth: 0.8
     });
+
+    const headlineMaxWidth = tableWidth - 8;
+    while (headlineFontSize > 7.2 && font.widthOfTextAtSize(headlineText, headlineFontSize) > headlineMaxWidth) {
+        headlineFontSize -= 0.4;
+    }
 
     page.drawText(headlineText, {
         x: tableX + 4,
@@ -89,6 +97,22 @@ function drawMeeshoSummaryHeader(
         page.drawRectangle({
             x: colX + ordColWidth + qtyColWidth,
             y: headerBottomY,
+            width: sizeColWidth,
+            height: headerRowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.8
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth + qtyColWidth + sizeColWidth,
+            y: headerBottomY,
+            width: colorColWidth,
+            height: headerRowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.8
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth + qtyColWidth + sizeColWidth + colorColWidth,
+            y: headerBottomY,
             width: skuColWidth,
             height: headerRowHeight,
             borderColor: rgb(0, 0, 0),
@@ -111,8 +135,22 @@ function drawMeeshoSummaryHeader(
             font,
             color: rgb(0, 0, 0)
         });
-        page.drawText("SKU ID", {
+        page.drawText("Size", {
             x: colX + ordColWidth + qtyColWidth + 4,
+            y: headerTextY,
+            size: headerFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+        page.drawText("Color", {
+            x: colX + ordColWidth + qtyColWidth + sizeColWidth + 4,
+            y: headerTextY,
+            size: headerFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+        page.drawText("SKU ID", {
+            x: colX + ordColWidth + qtyColWidth + sizeColWidth + colorColWidth + 4,
             y: headerTextY,
             size: headerFontSize,
             font,
@@ -126,6 +164,7 @@ function drawMeeshoSummaryHeader(
 function appendMeeshoSummaryPages(
     targetPdf: PDFDocument,
     entries: MeeshoSummaryEntry[],
+    courierEntries: CourierSummaryEntry[],
     font: PDFFont,
     pageWidth: number,
     pageHeight: number
@@ -147,7 +186,9 @@ function appendMeeshoSummaryPages(
     const colWidth1 = tableWidth;
     const ordColWidth1 = Math.min(48, colWidth1 * 0.12);
     const qtyColWidth1 = Math.min(48, colWidth1 * 0.12);
-    const skuColWidth1 = Math.max(80, colWidth1 - ordColWidth1 - qtyColWidth1);
+    const sizeColWidth1 = Math.min(64, colWidth1 * 0.14);
+    const colorColWidth1 = Math.min(72, colWidth1 * 0.16);
+    const skuColWidth1 = Math.max(80, colWidth1 - ordColWidth1 - qtyColWidth1 - sizeColWidth1 - colorColWidth1);
     const skuTextWidth1 = Math.max(24, skuColWidth1 - 8);
 
     let totalHeight1Col = 0;
@@ -163,7 +204,9 @@ function appendMeeshoSummaryPages(
 
     const ordColWidth = Math.min(48, colWidth * 0.12);
     const qtyColWidth = Math.min(48, colWidth * 0.12);
-    const skuColWidth = Math.max(80, colWidth - ordColWidth - qtyColWidth);
+    const sizeColWidth = Math.min(64, colWidth * 0.14);
+    const colorColWidth = Math.min(72, colWidth * 0.16);
+    const skuColWidth = Math.max(80, colWidth - ordColWidth - qtyColWidth - sizeColWidth - colorColWidth);
     const skuTextWidth = Math.max(24, skuColWidth - 8);
 
     let page = targetPdf.addPage([pageWidth, pageHeight]);
@@ -211,6 +254,22 @@ function appendMeeshoSummaryPages(
         page.drawRectangle({
             x: colX + ordColWidth + qtyColWidth,
             y: rowBottomY,
+            width: sizeColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth + qtyColWidth + sizeColWidth,
+            y: rowBottomY,
+            width: colorColWidth,
+            height: rowHeight,
+            borderColor: rgb(0, 0, 0),
+            borderWidth
+        });
+        page.drawRectangle({
+            x: colX + ordColWidth + qtyColWidth + sizeColWidth + colorColWidth,
+            y: rowBottomY,
             width: skuColWidth,
             height: rowHeight,
             borderColor: rgb(0, 0, 0),
@@ -238,11 +297,28 @@ function appendMeeshoSummaryPages(
             font,
             color: rgb(0, 0, 0)
         });
+        const sizeLines = wrapTextToWidth(entry.size || '-', font, rowFontSize, Math.max(24, sizeColWidth - 8));
+        const colorLines = wrapTextToWidth(entry.color || '-', font, rowFontSize, Math.max(24, colorColWidth - 8));
+
+        page.drawText(sizeLines[0] || '-', {
+            x: colX + ordColWidth + qtyColWidth + 4,
+            y: qtyTextY,
+            size: rowFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
+        page.drawText(colorLines[0] || '-', {
+            x: colX + ordColWidth + qtyColWidth + sizeColWidth + 4,
+            y: qtyTextY,
+            size: rowFontSize,
+            font,
+            color: rgb(0, 0, 0)
+        });
 
         const skuStartY = rowBottomY + rowHeight - rowPaddingY - rowFontSize;
         safeLines.forEach((line, index) => {
             page.drawText(line, {
-                x: colX + ordColWidth + qtyColWidth + 4,
+                x: colX + ordColWidth + qtyColWidth + sizeColWidth + colorColWidth + 4,
                 y: skuStartY - (index * rowLineHeight),
                 size: rowFontSize,
                 font,
@@ -284,6 +360,67 @@ function appendMeeshoSummaryPages(
         font,
         color: rgb(0, 0, 0)
     });
+
+    if (courierEntries.length === 0) return;
+
+    const courierHeadlineHeight = 22;
+    const courierHeaderHeight = 20;
+    const courierRowHeight = 20;
+    const courierFooterHeight = 20;
+    const courierColSpacing = 8;
+    const courierAvailableHeight = (pageHeight - 2 - courierHeadlineHeight - courierHeaderHeight) - marginBottom - courierFooterHeight;
+    const courierNumCols = (courierEntries.length * courierRowHeight) > courierAvailableHeight ? 2 : 1;
+    const courierColWidth = (tableWidth - (courierNumCols - 1) * courierColSpacing) / courierNumCols;
+    const packageColWidth = Math.min(120, courierColWidth * 0.3);
+    const partnerColWidth = courierColWidth - packageColWidth;
+
+    page = targetPdf.addPage([pageWidth, pageHeight]);
+    const headerTopY = pageHeight - 2;
+    const headlineBottomY = headerTopY - courierHeadlineHeight;
+    const headerBottomY = headlineBottomY - courierHeaderHeight;
+    const totalCourierPackages = courierEntries.reduce((sum, item) => sum + item.packageCount, 0);
+
+    page.drawRectangle({ x: tableX, y: headlineBottomY, width: tableWidth, height: courierHeadlineHeight, borderColor: rgb(0, 0, 0), borderWidth });
+    page.drawText(`Courier wise total package: ${totalCourierPackages}`, { x: tableX + 4, y: headlineBottomY + ((courierHeadlineHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+
+    for (let c = 0; c < courierNumCols; c++) {
+        const colX = tableX + (c * (courierColWidth + courierColSpacing));
+        page.drawRectangle({ x: colX, y: headerBottomY, width: packageColWidth, height: courierHeaderHeight, borderColor: rgb(0, 0, 0), borderWidth });
+        page.drawRectangle({ x: colX + packageColWidth, y: headerBottomY, width: partnerColWidth, height: courierHeaderHeight, borderColor: rgb(0, 0, 0), borderWidth });
+        page.drawText('Package', { x: colX + 4, y: headerBottomY + ((courierHeaderHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+        page.drawText('Courier Partner', { x: colX + packageColWidth + 4, y: headerBottomY + ((courierHeaderHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+    }
+
+    let courierCursorY = headerBottomY;
+    let courierCol = 0;
+    for (const item of courierEntries) {
+        if (courierCursorY - courierRowHeight < marginBottom + courierFooterHeight) {
+            if (courierCol < courierNumCols - 1) {
+                courierCol++;
+                courierCursorY = headerBottomY;
+            } else {
+                page = targetPdf.addPage([pageWidth, pageHeight]);
+                page.drawRectangle({ x: tableX, y: headlineBottomY, width: tableWidth, height: courierHeadlineHeight, borderColor: rgb(0, 0, 0), borderWidth });
+                page.drawText(`Courier wise total package: ${totalCourierPackages}`, { x: tableX + 4, y: headlineBottomY + ((courierHeadlineHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+                for (let c = 0; c < courierNumCols; c++) {
+                    const colX = tableX + (c * (courierColWidth + courierColSpacing));
+                    page.drawRectangle({ x: colX, y: headerBottomY, width: packageColWidth, height: courierHeaderHeight, borderColor: rgb(0, 0, 0), borderWidth });
+                    page.drawRectangle({ x: colX + packageColWidth, y: headerBottomY, width: partnerColWidth, height: courierHeaderHeight, borderColor: rgb(0, 0, 0), borderWidth });
+                    page.drawText('Package', { x: colX + 4, y: headerBottomY + ((courierHeaderHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+                    page.drawText('Courier Partner', { x: colX + packageColWidth + 4, y: headerBottomY + ((courierHeaderHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+                }
+                courierCursorY = headerBottomY;
+                courierCol = 0;
+            }
+        }
+        const colX = tableX + (courierCol * (courierColWidth + courierColSpacing));
+        const rowBottomY = courierCursorY - courierRowHeight;
+        page.drawRectangle({ x: colX, y: rowBottomY, width: packageColWidth, height: courierRowHeight, borderColor: rgb(0, 0, 0), borderWidth });
+        page.drawRectangle({ x: colX + packageColWidth, y: rowBottomY, width: partnerColWidth, height: courierRowHeight, borderColor: rgb(0, 0, 0), borderWidth });
+        page.drawText(String(item.packageCount), { x: colX + 4, y: rowBottomY + ((courierRowHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+        page.drawText(item.courierPartner, { x: colX + packageColWidth + 4, y: rowBottomY + ((courierRowHeight - rowFontSize) / 2), size: rowFontSize, font, color: rgb(0, 0, 0) });
+        courierCursorY = rowBottomY;
+    }
 }
 
 export async function processMeesho(
@@ -293,7 +430,8 @@ export async function processMeesho(
     options: ProcessorOptions
 ): Promise<void> {
     const copiedPages = await targetPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
-    const meeshoSummaryMap = new Map<string, { orderCount: number; totalQty: number; qty: number; sku: string }>();
+    const meeshoSummaryMap = new Map<string, { orderCount: number; totalQty: number; qty: number; sku: string; size: string; color: string }>();
+    const courierSummaryMap = new Map<string, number>();
     const processTimeStamp = formatProcessTimestamp(new Date());
 
     let defaultTlx = config.tlx;
@@ -325,6 +463,7 @@ export async function processMeesho(
         const { height: pageHeight } = page.getSize();
         let totalOrderQty = 1;
         let deliveryPartnerRank = Number.MAX_SAFE_INTEGER;
+        let courierPartner = '';
 
         const tlx = defaultTlx;
         const tly = defaultTly;
@@ -410,6 +549,19 @@ export async function processMeesho(
                 if (foundPartnerIndex >= 0) {
                     deliveryPartnerRank = foundPartnerIndex;
                 }
+                const courierMatch = pageText.match(/\b(Xpress\s*Bees|Xpressbees|ValmoPlus|Valmo Express|Valmo|Delhivery|Shadowfax)\b/i);
+                if (courierMatch?.[1]) {
+                    const raw = courierMatch[1].trim().toLowerCase().replace(/\s+/g, '');
+                    if (raw === 'xpressbees') courierPartner = 'Xpress Bees';
+                    else if (raw === 'valmoplus') courierPartner = 'ValmoPlus';
+                    else if (raw === 'valmoexpress') courierPartner = 'Valmo Express';
+                    else if (raw === 'valmo') courierPartner = 'Valmo';
+                    else if (raw === 'delhivery') courierPartner = 'Delhivery';
+                    else if (raw === 'shadowfax') courierPartner = 'Shadowfax';
+                }
+                if (options.treatValmoPlusAsValmo && /valmoplus/i.test(courierPartner)) {
+                    courierPartner = 'Valmo';
+                }
                 const productDetailsHeader = positioned.find(p => p.upper.includes('PRODUCT DETAILS'));
 
                 if (options.includeDateTimeOnLabel && productDetailsHeader && options.helveticaFont) {
@@ -431,11 +583,16 @@ export async function processMeesho(
 
                 const skuHeader = positioned.find(p => p.upper === 'SKU');
                 const sizeHeader = positioned.find(p => p.upper === 'SIZE');
+                const colorHeader = positioned.find(p => p.upper === 'COLOR');
                 const qtyHeader = positioned.find(p => p.upper === 'QTY');
 
                 if (skuHeader && sizeHeader && qtyHeader) {
                     const skuMinX = skuHeader.x - 5;
                     const skuMaxX = sizeHeader.x - 5;
+                    const sizeMinX = sizeHeader.x - 5;
+                    const sizeMaxX = colorHeader ? colorHeader.x - 5 : qtyHeader.x - 5;
+                    const colorMinX = colorHeader ? colorHeader.x - 5 : Number.MAX_SAFE_INTEGER;
+                    const colorMaxX = colorHeader ? qtyHeader.x - 5 : Number.MAX_SAFE_INTEGER;
                     const qtyMinX = qtyHeader.x - 5;
                     const qtyMaxX = qtyHeader.x + 35;
 
@@ -452,6 +609,21 @@ export async function processMeesho(
 
                         const qtyWord = dataLine.words.find(w => w.x >= qtyMinX && w.x <= qtyMaxX);
                         const qty = qtyWord ? parseInt(qtyWord.text.replace(/\D/g, '')) || 1 : 1;
+                        const sizeText = dataLine.words.filter(w => w.x >= sizeMinX && w.x <= sizeMaxX).map(w => w.text).join(' ').trim() || '-';
+                        let colorText = '-';
+                        if (colorHeader) {
+                            colorText = dataLine.words
+                                .filter(w => w.x >= colorMinX && w.x <= colorMaxX)
+                                .map(w => w.text)
+                                .join(' ')
+                                .trim() || '-';
+                        } else {
+                            const qtyIdx = dataLine.words.findIndex(w => w.x >= qtyMinX && w.x <= qtyMaxX);
+                            if (qtyIdx > 0) {
+                                const prevWord = dataLine.words[qtyIdx - 1]?.text?.trim();
+                                if (prevWord) colorText = prevWord;
+                            }
+                        }
 
                         const forbidden = ['SKU', 'SIZE', 'QTY', 'COLOR', 'ORDER NO.', 'FREE SIZE', 'NA'];
                         if (skuText && !forbidden.includes(skuText.toUpperCase())) {
@@ -467,8 +639,8 @@ export async function processMeesho(
                             }
 
                             if (options.includeMeeshoOrderSummary) {
-                                const key = `${skuText}::${qty}`;
-                                const existing = meeshoSummaryMap.get(key) ?? { orderCount: 0, totalQty: 0, qty: qty, sku: skuText };
+                                const key = `${skuText}::${qty}::${sizeText}::${colorText}`;
+                                const existing = meeshoSummaryMap.get(key) ?? { orderCount: 0, totalQty: 0, qty: qty, sku: skuText, size: sizeText, color: colorText };
                                 existing.orderCount += 1;
                                 existing.totalQty += qty;
                                 meeshoSummaryMap.set(key, existing);
@@ -481,6 +653,9 @@ export async function processMeesho(
             } catch (e) {
                 console.warn("Failed to extract Meesho data for page", i, e);
             }
+        }
+        if (courierPartner) {
+            courierSummaryMap.set(courierPartner, (courierSummaryMap.get(courierPartner) ?? 0) + 1);
         }
 
         labelsToInclude.push({ page, totalQty: totalOrderQty, deliveryPartnerRank });
@@ -514,6 +689,8 @@ export async function processMeesho(
             const summaryEntries = [...meeshoSummaryMap.values()]
                 .map((summary) => ({
                     sku: summary.sku,
+                    size: summary.size,
+                    color: summary.color,
                     orderCount: summary.orderCount,
                     qtyPerSku: String(summary.qty),
                     totalQty: summary.totalQty
@@ -521,10 +698,17 @@ export async function processMeesho(
                 .sort((a, b) => {
                     const skuCompare = a.sku.localeCompare(b.sku, undefined, { sensitivity: 'base', numeric: true });
                     if (skuCompare !== 0) return skuCompare;
-                    return Number(a.qtyPerSku) - Number(b.qtyPerSku);
+                    const qtyCompare = Number(a.qtyPerSku) - Number(b.qtyPerSku);
+                    if (qtyCompare !== 0) return qtyCompare;
+                    const sizeCompare = a.size.localeCompare(b.size, undefined, { sensitivity: 'base', numeric: true });
+                    if (sizeCompare !== 0) return sizeCompare;
+                    return a.color.localeCompare(b.color, undefined, { sensitivity: 'base', numeric: true });
                 });
+            const courierEntries = [...courierSummaryMap.entries()]
+                .map(([courierPartner, packageCount]) => ({ courierPartner, packageCount }))
+                .sort((a, b) => b.packageCount - a.packageCount || a.courierPartner.localeCompare(b.courierPartner));
 
-            appendMeeshoSummaryPages(targetPdf, summaryEntries, options.helveticaFont, pageWidth, pageHeight);
+            appendMeeshoSummaryPages(targetPdf, summaryEntries, courierEntries, options.helveticaFont, pageWidth, pageHeight);
         }
     }
 }

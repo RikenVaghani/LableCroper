@@ -157,7 +157,8 @@ export async function cropLabels(
     summaryOrientation: 'portrait' | 'landscape' = 'portrait',
     showMultiQtyOnBottom: boolean = false,
     includeMultiQtySummary: boolean = false,
-    orderMeeshoByDeliveryPartner: boolean = false
+    orderMeeshoByDeliveryPartner: boolean = false,
+    treatValmoPlusAsValmo: boolean = false
 ): Promise<PDFDocument> {
     const newPdf = await PDFDocument.create();
     
@@ -197,6 +198,7 @@ export async function cropLabels(
         showMultiQtyOnBottom,
         includeMultiQtySummary,
         orderMeeshoByDeliveryPartner,
+        treatValmoPlusAsValmo,
         helveticaFont,
         originalDocProxy
     };
