@@ -91,6 +91,21 @@ function isAmazonInvoicePageText(text: string): boolean {
     return hasDescription && hasTotal && hasQty;
 }
 
+function isAmazonInvoiceContinuationPageText(text: string): boolean {
+    const normalized = normalizeWhitespace(text).toUpperCase();
+    if (!normalized || isLikelyProcessedAmazonOutput(normalized)) return false;
+
+    const hasInvoiceHeader =
+        normalized.includes("TAX INVOICE/BILL OF SUPPLY/CASH MEMO") ||
+        normalized.includes("TRIPLICATE FOR SUPPLIER");
+    const hasContinuationMarker = /PAGE\s+\d+\s+OF\s+\d+/.test(normalized);
+    const hasPaymentBlock =
+        normalized.includes("PAYMENT TRANSACTION ID") ||
+        normalized.includes("DATE & TIME:");
+
+    return hasInvoiceHeader && hasContinuationMarker && hasPaymentBlock;
+}
+
 function drawAmazonSummaryHeader(
     page: PDFPage,
     font: PDFFont,
@@ -681,7 +696,10 @@ export async function processAmazon(
             try {
                 const sourcePage = await options.originalDocProxy.getPage(pageNo);
                 const sourceText = await extractTextFromPage(sourcePage);
-                pageInvoiceFlags.push(isAmazonInvoicePageText(sourceText));
+                pageInvoiceFlags.push(
+                    isAmazonInvoicePageText(sourceText) ||
+                    isAmazonInvoiceContinuationPageText(sourceText)
+                );
             } catch {
                 pageInvoiceFlags.push(false);
             }
