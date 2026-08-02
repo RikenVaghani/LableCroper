@@ -302,6 +302,12 @@ export function LabelCropper() {
   const [includeMeeshoOrderSummary, setIncludeMeeshoOrderSummary] = useState(
     !!savedSettings?.includeMeeshoOrderSummary
   )
+  const [includeMeeshoCourierSummary, setIncludeMeeshoCourierSummary] = useState(
+    !!savedSettings?.includeMeeshoCourierSummary
+  )
+  const [orderMeeshoBySku, setOrderMeeshoBySku] = useState(
+    !!savedSettings?.orderMeeshoBySku
+  )
   const [includeFlipkartOrderSummary, setIncludeFlipkartOrderSummary] = useState(
     !!savedSettings?.includeFlipkartOrderSummary
   )
@@ -355,6 +361,8 @@ export function LabelCropper() {
       showMultiQtyOnBottom,
       includeMultiQtySummary,
       orderMeeshoByDeliveryPartner,
+      includeMeeshoCourierSummary,
+      orderMeeshoBySku,
       treatValmoPlusAsValmo,
       labelMode
     }
@@ -374,6 +382,8 @@ export function LabelCropper() {
     showMultiQtyOnBottom,
     includeMultiQtySummary,
     orderMeeshoByDeliveryPartner,
+    includeMeeshoCourierSummary,
+    orderMeeshoBySku,
     treatValmoPlusAsValmo,
     labelMode
   ])
@@ -543,6 +553,8 @@ export function LabelCropper() {
           showMultiQtyOnBottom,
           includeMultiQtySummary,
           orderMeeshoByDeliveryPartner,
+          includeMeeshoCourierSummary,
+          orderMeeshoBySku,
           treatValmoPlusAsValmo
         )
         const bytes = await processedPdf.save({ useObjectStreams: false })
@@ -571,6 +583,8 @@ export function LabelCropper() {
           showMultiQtyOnBottom,
           includeMultiQtySummary,
           orderMeeshoByDeliveryPartner,
+          includeMeeshoCourierSummary,
+          orderMeeshoBySku,
           treatValmoPlusAsValmo
         )
           const bytes = await croppedPdf.save({ useObjectStreams: false })
@@ -875,11 +889,12 @@ export function LabelCropper() {
                 threshold={summaryThreshold}
                 onThresholdChange={setSummaryThreshold}
               />
+              <ToggleOption label="Add Delivery Partner Summary" checked={includeMeeshoCourierSummary} onChange={setIncludeMeeshoCourierSummary} />
               
-
               <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
               <ToggleOption label="Add Process Time" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
+              <ToggleOption label="Order by SKU" checked={orderMeeshoBySku} onChange={setOrderMeeshoBySku} />
               <ToggleOption label="Order by Delivery Partner" checked={orderMeeshoByDeliveryPartner} onChange={setOrderMeeshoByDeliveryPartner} />
               <ToggleOption label="Treat ValmoPlus as Valmo" checked={treatValmoPlusAsValmo} onChange={setTreatValmoPlusAsValmo} />
             </div>

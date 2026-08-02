@@ -169,7 +169,7 @@ function appendMeeshoSummaryPages(
     pageWidth: number,
     pageHeight: number
 ): void {
-    if (entries.length === 0) return;
+    if (entries.length === 0 && courierEntries.length === 0) return;
 
     const tableX = 8;
     const tableWidth = pageWidth - 16;
@@ -374,7 +374,12 @@ function appendMeeshoSummaryPages(
     const packageColWidth = Math.min(120, courierColWidth * 0.3);
     const partnerColWidth = courierColWidth - packageColWidth;
 
-    page = targetPdf.addPage([pageWidth, pageHeight]);
+    if (entries.length === 0) {
+        page = targetPdf.addPage([pageWidth, pageHeight]);
+    } else {
+        // Only add a new page if we need to, but to keep it simple and match original behavior, always add for courier summary
+        page = targetPdf.addPage([pageWidth, pageHeight]);
+    }
     const headerTopY = pageHeight - 2;
     const headlineBottomY = headerTopY - courierHeadlineHeight;
     const headerBottomY = headlineBottomY - courierHeaderHeight;
@@ -449,7 +454,7 @@ export async function processMeesho(
         }
     }
 
-    const labelsToInclude: { page: PDFPage, totalQty: number, deliveryPartnerRank: number }[] = [];
+    const labelsToInclude: { page: PDFPage, totalQty: number, deliveryPartnerRank: number, sku: string }[] = [];
     const deliveryPartnerPriority: RegExp[] = [
         /\bvalmoplus\b/i,
         /\bvalmo express\b/i,
@@ -465,6 +470,7 @@ export async function processMeesho(
         let totalOrderQty = 1;
         let deliveryPartnerRank = Number.MAX_SAFE_INTEGER;
         let courierPartner = '';
+        let currentSku = '';
 
         const tlx = defaultTlx;
         const tly = defaultTly;
@@ -531,9 +537,11 @@ export async function processMeesho(
                 !!options.helveticaFont ||
                 !!options.extractSku ||
                 !!options.includeMeeshoOrderSummary ||
+                !!options.includeMeeshoCourierSummary ||
                 !!options.includeDateTimeOnLabel ||
                 !!options.includeMultiQtySummary ||
-                !!options.orderMeeshoByDeliveryPartner
+                !!options.orderMeeshoByDeliveryPartner ||
+                !!options.orderMeeshoBySku
             );
 
         if (shouldReadMeeshoTextLayer) {
@@ -633,6 +641,7 @@ export async function processMeesho(
                         const forbidden = ['SKU', 'SIZE', 'QTY', 'COLOR', 'ORDER NO.', 'FREE SIZE', 'NA'];
                         if (skuText && !forbidden.includes(skuText.toUpperCase())) {
                             totalOrderQty = qty;
+                            currentSku = skuText;
                             if (options.extractSku && options.helveticaFont) {
                                 page.drawText(`SKU: ${skuText}`, {
                                     x: x + 10,
@@ -663,16 +672,19 @@ export async function processMeesho(
             courierSummaryMap.set(courierPartner, (courierSummaryMap.get(courierPartner) ?? 0) + 1);
         }
 
-        labelsToInclude.push({ page, totalQty: totalOrderQty, deliveryPartnerRank });
+        labelsToInclude.push({ page, totalQty: totalOrderQty, deliveryPartnerRank, sku: currentSku });
     }
 
-    if (options.orderMeeshoByDeliveryPartner || options.includeMultiQtySummary) {
+    if (options.orderMeeshoByDeliveryPartner || options.includeMultiQtySummary || options.orderMeeshoBySku) {
         labelsToInclude.sort((a, b) => {
             if (options.includeMultiQtySummary && a.totalQty !== b.totalQty) {
                 return a.totalQty - b.totalQty;
             }
             if (options.orderMeeshoByDeliveryPartner && a.deliveryPartnerRank !== b.deliveryPartnerRank) {
                 return a.deliveryPartnerRank - b.deliveryPartnerRank;
+            }
+            if (options.orderMeeshoBySku && a.sku !== b.sku) {
+                return a.sku.localeCompare(b.sku, undefined, { numeric: true, sensitivity: 'base' });
             }
             return 0;
         });
@@ -683,7 +695,7 @@ export async function processMeesho(
         targetPdf.addPage(item.page);
     }
 
-    if (options.includeMeeshoOrderSummary && options.helveticaFont && copiedPages.length > 0) {
+    if ((options.includeMeeshoOrderSummary || options.includeMeeshoCourierSummary) && options.helveticaFont && copiedPages.length > 0) {
         const orderCount = copiedPages.length;
         const threshold = options.summaryThreshold ?? 0;
 
@@ -713,7 +725,14 @@ export async function processMeesho(
                 .map(([courierPartner, packageCount]) => ({ courierPartner, packageCount }))
                 .sort((a, b) => b.packageCount - a.packageCount || a.courierPartner.localeCompare(b.courierPartner));
 
-            appendMeeshoSummaryPages(targetPdf, summaryEntries, courierEntries, options.helveticaFont, pageWidth, pageHeight);
+            appendMeeshoSummaryPages(
+                targetPdf,
+                options.includeMeeshoOrderSummary ? summaryEntries : [],
+                options.includeMeeshoCourierSummary ? courierEntries : [],
+                options.helveticaFont,
+                pageWidth,
+                pageHeight
+            );
         }
     }
 }

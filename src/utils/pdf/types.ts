@@ -102,6 +102,8 @@ export type ProcessorOptions = {
     showMultiQtyOnBottom?: boolean;
     includeMultiQtySummary?: boolean;
     orderMeeshoByDeliveryPartner?: boolean;
+    includeMeeshoCourierSummary?: boolean;
+    orderMeeshoBySku?: boolean;
     treatValmoPlusAsValmo?: boolean;
     helveticaFont?: PDFFont | null;
     originalDocProxy?: PdfJsDocumentProxy | null;
