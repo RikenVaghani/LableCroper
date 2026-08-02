@@ -1,20 +1,31 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+
 :root {
   --font-sans: 'Manrope', 'Segoe UI', sans-serif;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
 }
 
 @layer base {
   * {
     box-sizing: border-box;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   }
 
   body {
     margin: 0;
     min-height: 100vh;
     font-family: var(--font-sans);
-    color: #0f172a;
-    background: #f8fafc;
+    color: var(--foreground);
+    background: var(--background);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -40,4 +51,29 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Placeholder support for contenteditable */
+[data-placeholder-visible="true"]::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+}
+
+.dark [data-placeholder-visible="true"]::before {
+  color: #64748b;
+}
+
+/* Ensure formatting works inside contenteditable even with Tailwind resets */
+[contenteditable] b, [contenteditable] strong {
+  font-weight: bold !important;
+}
+[contenteditable] i, [contenteditable] em {
+  font-style: italic !important;
+}
+[contenteditable] u {
+  text-decoration: underline !important;
 }

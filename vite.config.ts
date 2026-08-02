@@ -8,5 +8,20 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: '/',
+  server: {
+    host: 'localhost',
+    port: 5173,
+    strictPort: true,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-pdf': ['pdf-lib', 'pdfjs-dist'],
+          'vendor-utils': ['jszip', 'lucide-react', 'framer-motion']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  }
 })
