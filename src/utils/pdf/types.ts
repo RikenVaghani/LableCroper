@@ -40,6 +40,7 @@ export type PdfJsPageProxy = {
 };
 
 export type PdfJsDocumentProxy = {
+    numPages?: number;
     getPage: (pageNumber: number) => Promise<PdfJsPageProxy>;
 };
 
@@ -52,7 +53,15 @@ export type PositionedTextItem = {
 
 export type AmazonInvoiceLineItem = {
     description: string;
+    skuId?: string;
     quantity: string | null;
+    unitPrice?: string;
+    netAmount?: string;
+    taxRate?: string;
+    taxType?: string;
+    taxAmount?: string;
+    totalAmount?: string;
+    rawText?: string;
 };
 
 export type AmazonInvoiceLabelData = {

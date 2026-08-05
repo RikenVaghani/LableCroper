@@ -8,7 +8,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 // 2. Import modularized parts
 import { LABEL_CONFIGS } from './pdf/config';
 import { loadPDF } from './pdf/commonUtils';
-import { processAmazon } from './pdf/processors/amazonProcessor';
+import { buildAmazonOrderDetailsCsv, processAmazon } from './pdf/processors/amazonProcessor';
 import { processMeesho } from './pdf/processors/meeshoProcessor';
 import { processFlipkart } from './pdf/processors/flipkartProcessor';
 
@@ -34,11 +34,18 @@ export {
     cropPDF,
     cropPDFByBox,
     addPageNumbersToPDF,
+    buildAmazonOrderDetailsCsv,
     type CropBoxNormalized,
     type CropMarginsPercent,
     type CompressionLevel,
     type PageNumberPosition
 };
+
+export async function buildAmazonOrderDetailsCsvFromPdf(sourcePdf: PDFDocument): Promise<string> {
+    const pdfBytes = await sourcePdf.save();
+    const originalDocProxy = await pdfjsLib.getDocument(pdfBytes).promise as PdfJsDocumentProxy;
+    return buildAmazonOrderDetailsCsv(originalDocProxy);
+}
 
 // 5. Types for orchestrator logic
 import type { CropConfig, AmazonDescriptionMode, FlipkartDescriptionMode, PdfJsDocumentProxy } from './pdf/types';

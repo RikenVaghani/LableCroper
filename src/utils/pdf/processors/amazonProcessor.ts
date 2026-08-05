@@ -7,12 +7,13 @@ import type {
     PositionedTextItem,
     AmazonInvoiceLineItem,
     ProcessorOptions,
-    CropConfig
+    CropConfig,
+    PdfJsDocumentProxy
 } from '../types';
-import { 
+import {
     extractTextFromPage,
-    normalizeWhitespace, 
-    getPositionedTextItems, 
+    normalizeWhitespace,
+    getPositionedTextItems,
     wrapTextToWidth,
     groupTextLinesByY,
     formatProcessTimestamp
@@ -400,6 +401,38 @@ function extractAmazonQtyFromLine(
     return extractNumericQty(inlinePriceQtyMatch[1]);
 }
 
+function extractAmazonMoneyValues(lineText: string): string[] {
+    return [...lineText.matchAll(/(?:₹|INR|RS\.?)\s*[\d,]+(?:\.\d+)?/gi)]
+        .map(match => normalizeWhitespace(match[0]));
+}
+
+function extractAmazonLineAmounts(lineText: string): Partial<AmazonInvoiceLineItem> {
+    const moneyValues = extractAmazonMoneyValues(lineText);
+    const taxRate = lineText.match(/\b\d+(?:\.\d+)?%\b/)?.[0] ?? "";
+    const taxType = lineText.match(/\b(?:IGST|CGST|SGST|UTGST)\b/i)?.[0]?.toUpperCase() ?? "";
+
+    return {
+        unitPrice: moneyValues[0] ?? "",
+        netAmount: moneyValues[1] ?? "",
+        taxRate,
+        taxType,
+        taxAmount: moneyValues.length >= 4 ? moneyValues[moneyValues.length - 2] : "",
+        totalAmount: moneyValues.length >= 3 ? moneyValues[moneyValues.length - 1] : ""
+    };
+}
+
+function extractAmazonOrderMetadata(text: string): { orderNumber: string; orderDate: string; shipDate: string } {
+    const normalized = normalizeWhitespace(text);
+    const orderNumber =
+        normalized.match(/Order\s*(?:Number|No\.?|#)\s*:?\s*([0-9-]{10,})/i)?.[1] ?? "";
+    const orderDate =
+        normalized.match(/Order\s*Date\s*:?\s*([0-9]{1,2}[./-][0-9]{1,2}[./-][0-9]{2,4})/i)?.[1] ?? "";
+    const shipDate =
+        normalized.match(/Ship\s*Date\s*:?\s*([0-9]{1,2}[./-][0-9]{1,2}[./-][0-9]{2,4})/i)?.[1] ?? "";
+
+    return { orderNumber, orderDate, shipDate };
+}
+
 async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy): Promise<AmazonInvoiceLabelData> {
     const textContent = await pdfPage.getTextContent();
     const positioned = getPositionedTextItems(textContent.items);
@@ -443,7 +476,7 @@ async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy):
 
     const lines = groupTextLinesByY(bodyItems, lineTolerance);
     const lineItems: AmazonInvoiceLineItem[] = [];
-    let currentItem: { parts: string[]; quantity: string | null } | null = null;
+    let currentItem: { parts: string[]; quantity: string | null; rawLines: string[]; amounts: Partial<AmazonInvoiceLineItem> } | null = null;
 
     for (const line of lines) {
         const hasSerialNumber = line.words.some(
@@ -458,17 +491,22 @@ async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy):
         );
 
         const lineQty = extractAmazonQtyFromLine(line.words, qtyBounds);
+        const rawLineText = normalizeWhitespace(line.words.map(word => word.text).join(' '));
+        const lineAmounts = extractAmazonLineAmounts(rawLineText);
 
         if (hasSerialNumber) {
             if (currentItem && currentItem.parts.length > 0) {
                 lineItems.push({
                     description: normalizeWhitespace(currentItem.parts.join(' ')),
-                    quantity: currentItem.quantity
+                    skuId: extractTextInsideParentheses(currentItem.parts.join(' ')),
+                    quantity: currentItem.quantity,
+                    ...currentItem.amounts,
+                    rawText: normalizeWhitespace(currentItem.rawLines.join(' '))
                 });
             }
-            currentItem = { parts: [], quantity: null };
+            currentItem = { parts: [], quantity: null, rawLines: [], amounts: {} };
         } else if (!currentItem && descriptionText) {
-            currentItem = { parts: [], quantity: null };
+            currentItem = { parts: [], quantity: null, rawLines: [], amounts: {} };
         }
 
         if (!currentItem) continue;
@@ -478,15 +516,29 @@ async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy):
             currentItem.parts.push(descriptionText);
         }
 
+        if (rawLineText) {
+            currentItem.rawLines.push(rawLineText);
+        }
+
         if (!currentItem.quantity && lineQty) {
             currentItem.quantity = lineQty;
         }
+
+        currentItem.amounts = {
+            ...currentItem.amounts,
+            ...Object.fromEntries(
+                Object.entries(lineAmounts).filter(([, value]) => Boolean(value))
+            )
+        };
     }
 
     if (currentItem && currentItem.parts.length > 0) {
         lineItems.push({
             description: normalizeWhitespace(currentItem.parts.join(' ')),
-            quantity: currentItem.quantity
+            skuId: extractTextInsideParentheses(currentItem.parts.join(' ')),
+            quantity: currentItem.quantity,
+            ...currentItem.amounts,
+            rawText: normalizeWhitespace(currentItem.rawLines.join(' '))
         });
     }
 
@@ -512,12 +564,78 @@ async function extractAmazonDescriptionFromInvoicePage(pdfPage: PdfJsPageProxy):
 
             lineItems.push({
                 description: fallbackDescription,
-                quantity: fallbackQty
+                skuId: extractTextInsideParentheses(fallbackDescription),
+                quantity: fallbackQty,
+                rawText: fallbackDescription
             });
         }
     }
 
     return { lineItems };
+}
+
+function csvEscape(value: string | number | null | undefined): string {
+    const text = String(value ?? "");
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export async function buildAmazonOrderDetailsCsv(originalDocProxy: PdfJsDocumentProxy): Promise<string> {
+    const headers = [
+        "No",
+        //"Description",
+        "SKU ID",
+        //"Unit Price",
+        "Qty",
+        //"Net Amount",
+        //"Tax Rate",
+        //"Tax Type",
+        //"Tax Amount",
+        //"Total Amount",
+        "Order Number",
+        //"Order Date",
+        //"Ship Date",
+        //"Invoice Page",
+        //"Raw Detail"
+    ];
+    const rows: string[][] = [];
+    let rowNo = 1;
+    const pageCount = Number(originalDocProxy.numPages ?? 0);
+
+    for (let pageNo = 1; pageNo <= pageCount; pageNo++) {
+        const page = await originalDocProxy.getPage(pageNo);
+        const pageText = await extractTextFromPage(page);
+        if (!isAmazonInvoicePageText(pageText) && !isAmazonInvoiceContinuationPageText(pageText)) {
+            continue;
+        }
+
+        const metadata = extractAmazonOrderMetadata(pageText);
+        const { lineItems } = await extractAmazonDescriptionFromInvoicePage(page);
+
+        for (const item of lineItems) {
+            rows.push([
+                String(rowNo++),
+                //item.description,
+                item.skuId ?? "",
+                //item.unitPrice ?? "",
+                item.quantity ?? "",
+                //item.netAmount ?? "",
+                //item.taxRate ?? "",
+                //item.taxType ?? "",
+                //item.taxAmount ?? "",
+                //item.totalAmount ?? "",
+                metadata.orderNumber,
+                //metadata.orderDate,
+                //metadata.shipDate,
+                //String(pageNo),
+                //item.rawText ?? ""
+            ]);
+        }
+    }
+
+    return [
+        headers.map(csvEscape).join(","),
+        ...rows.map(row => row.map(csvEscape).join(","))
+    ].join("\r\n");
 }
 
 function fitDescriptionInBox(
