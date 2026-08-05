@@ -3,6 +3,7 @@ import JSZip from 'jszip'
 import { FileUploader } from '../components/FileUploader'
 import {
   cropLabels,
+  buildAmazonOrderDetailsCsvFromPdf,
   detectPlatformFromPdf,
   LABEL_CONFIGS,
   loadPDF,
@@ -299,6 +300,9 @@ export function LabelCropper() {
   const [includeAmazonOrderSummary, setIncludeAmazonOrderSummary] = useState(
     !!savedSettings?.includeAmazonOrderSummary
   )
+  const [includeAmazonOrderDetailsExcel, setIncludeAmazonOrderDetailsExcel] = useState(
+    !!savedSettings?.includeAmazonOrderDetailsExcel
+  )
   const [includeMeeshoOrderSummary, setIncludeMeeshoOrderSummary] = useState(
     !!savedSettings?.includeMeeshoOrderSummary
   )
@@ -352,6 +356,7 @@ export function LabelCropper() {
       amazonDescriptionMode,
       flipkartDescriptionMode,
       includeAmazonOrderSummary,
+      includeAmazonOrderDetailsExcel,
       includeMeeshoOrderSummary,
       includeFlipkartOrderSummary,
       includePageNumbers,
@@ -373,6 +378,7 @@ export function LabelCropper() {
     amazonDescriptionMode,
     flipkartDescriptionMode,
     includeAmazonOrderSummary,
+    includeAmazonOrderDetailsExcel,
     includeMeeshoOrderSummary,
     includeFlipkartOrderSummary,
     includePageNumbers,
@@ -562,6 +568,13 @@ export function LabelCropper() {
           name: getDownloadName(`${config.label}_Merged`, 'pdf', undefined, batchTimestamp),
           blob: new Blob([bytes as BlobPart], { type: 'application/pdf' })
         })
+        if (selectedPlatform === 'AMAZON' && includeAmazonOrderDetailsExcel) {
+          const csv = await buildAmazonOrderDetailsCsvFromPdf(sourcePdf)
+          results.push({
+            name: getDownloadName(`${config.label}_Order_Details`, 'csv', undefined, batchTimestamp),
+            blob: new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+          })
+        }
       } else {
         for (const file of inputFiles) {
         const sourcePdf = await loadPDF(file)
@@ -592,6 +605,13 @@ export function LabelCropper() {
             name: getDownloadName(config.label, 'pdf', file.name, batchTimestamp),
             blob: new Blob([bytes as BlobPart], { type: 'application/pdf' })
           })
+          if (selectedPlatform === 'AMAZON' && includeAmazonOrderDetailsExcel) {
+            const csv = await buildAmazonOrderDetailsCsvFromPdf(sourcePdf)
+            results.push({
+              name: getDownloadName(`${config.label}_Order_Details`, 'csv', file.name, batchTimestamp),
+              blob: new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+            })
+          }
         }
       }
 
@@ -843,6 +863,7 @@ export function LabelCropper() {
               <ToggleOption label="Add Page Numbers" checked={includePageNumbers} onChange={setIncludePageNumbers} />
               <ToggleOption label="Add Process Time" checked={includeDateTimeOnLabel} onChange={setIncludeDateTimeOnLabel} />
               <ToggleOption label="Sort by Quantity (1, 2, 3+)" checked={includeMultiQtySummary} onChange={setIncludeMultiQtySummary} />
+              <ToggleOption label="Order Details Excel" checked={includeAmazonOrderDetailsExcel} onChange={setIncludeAmazonOrderDetailsExcel} />
             </div>
           </section>
         )}
